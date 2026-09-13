@@ -248,6 +248,46 @@ export const TransactionFilters = ({
                 variant="filter"
               />
             </div>
+
+            {onKindChange && (
+              <div className="filter-group">
+                <label htmlFor="kind-filter" className="filter-label">
+                  Kind
+                </label>
+                <StyledSelect
+                  id="kind-filter"
+                  value={kind}
+                  onChange={(v) => onKindChange(v as CategoryKind | 'all')}
+                  options={[
+                    { value: 'all', label: 'All' },
+                    ...(Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[]).map((k) => ({
+                      value: k,
+                      label: CATEGORY_KIND_LABELS[k],
+                    })),
+                  ]}
+                />
+              </div>
+            )}
+
+            {onPriorityChange && (
+              <div className="filter-group">
+                <label htmlFor="priority-filter" className="filter-label">
+                  Priority
+                </label>
+                <StyledSelect
+                  id="priority-filter"
+                  value={priority}
+                  onChange={(v) => onPriorityChange(v as CategoryPriority | 'all')}
+                  options={[
+                    { value: 'all', label: 'All' },
+                    ...(Object.keys(CATEGORY_PRIORITY_LABELS) as CategoryPriority[]).map((p) => ({
+                      value: p,
+                      label: CATEGORY_PRIORITY_LABELS[p],
+                    })),
+                  ]}
+                />
+              </div>
+            )}
           </div>
 
           <div className="filters-row secondary-filters">
@@ -315,46 +355,6 @@ export const TransactionFilters = ({
                 ]}
               />
             </div>
-
-            {onKindChange && (
-              <div className="filter-group">
-                <label htmlFor="kind-filter" className="filter-label">
-                  Kind
-                </label>
-                <StyledSelect
-                  id="kind-filter"
-                  value={kind}
-                  onChange={(v) => onKindChange(v as CategoryKind | 'all')}
-                  options={[
-                    { value: 'all', label: 'All' },
-                    ...(Object.keys(CATEGORY_KIND_LABELS) as CategoryKind[]).map((k) => ({
-                      value: k,
-                      label: CATEGORY_KIND_LABELS[k],
-                    })),
-                  ]}
-                />
-              </div>
-            )}
-
-            {onPriorityChange && (
-              <div className="filter-group">
-                <label htmlFor="priority-filter" className="filter-label">
-                  Priority
-                </label>
-                <StyledSelect
-                  id="priority-filter"
-                  value={priority}
-                  onChange={(v) => onPriorityChange(v as CategoryPriority | 'all')}
-                  options={[
-                    { value: 'all', label: 'All' },
-                    ...(Object.keys(CATEGORY_PRIORITY_LABELS) as CategoryPriority[]).map((p) => ({
-                      value: p,
-                      label: CATEGORY_PRIORITY_LABELS[p],
-                    })),
-                  ]}
-                />
-              </div>
-            )}
 
             <div className="filter-group amount-group">
               <label className="filter-label">Amount</label>
