@@ -124,7 +124,9 @@ jobs:
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright 1.54 does not support.
+    # Unpin once @playwright/test is upgraded to a release that supports it.
+    runs-on: ubuntu-24.04
     needs: [detect-changes, test-backend, test-frontend]
     if: |
       always() &&
