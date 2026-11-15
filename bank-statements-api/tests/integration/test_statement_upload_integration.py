@@ -346,6 +346,76 @@ class TestStatementUploadIntegration:
         dates = {t.date.strftime("%Y-%m-%d") for t in transactions}
         assert dates == {"2024-12-11", "2024-12-07", "2024-10-10"}
 
+    def test_upload_portuguese_bank_tsv_whose_first_line_has_no_delimiter(self, db_session, llm_client, test_user):
+        """The same bank also exports a receipt whose title line contains neither a tab nor a
+        comma. The delimiter must be found from the body, not from line one alone."""
+
+        filename = "comprovativo.tsv"
+        tsv_text = (
+            "Consultar extrato - 15-11-2026 : 0217005412400\r\n"
+            "Nome empresa \tCONDOMINIO PREDIO SITO R LIMA 142\r\n"
+            "Saldo contabilístico Inicial \t5.155,18 \r\n"
+            "Saldo contabilístico final \t5.225,33 \r\n"
+            "\r\n"
+            "Data mov. \tData valor \tDescrição \tMovimento \tSaldo contabilístico após movimento \t\r\n"
+            "08-11-2026\t08-11-2026\tCOM MANUTENCAO CONTA \t-10,40\t5.225,33\t\r\n"
+            "01-11-2026\t01-11-2026\tSalvador Madeira 1 E \t19,80\t5.235,73\t\r\n"
+            "27-10-2026\t27-10-2026\tTFI JORGE JESUS COSTA \t51,27\t5.215,93\t\r\n"
+        )
+        tsv_content = tsv_text.encode("cp1252")
+
+        llm_client.generate.return_value = """
+        {
+            "column_mapping": {
+                "date": "Data mov. ",
+                "amount": "Movimento ",
+                "description": "Descrição "
+            },
+            "header_row_index": 4,
+            "data_start_row_index": 5
+        }
+        """
+
+        dependencies = build_internal_dependencies(ExternalDependencies(db=db_session, llm_client=llm_client))
+
+        analysis_result = dependencies.statement_analyzer_service.analyze(
+            user_id=test_user.id,
+            filename=filename,
+            file_content=tsv_content,
+        )
+
+        assert analysis_result.file_type == "TSV", "a preamble line without a delimiter must not hide the format"
+        assert analysis_result.total_transactions == 3
+
+        account = Account(name="Condomínio Lima", user_id=test_user.id)
+        db_session.add(account)
+        db_session.flush()
+
+        upload_result = dependencies.statement_upload_service.upload_statement(
+            user_id=test_user.id,
+            upload_data=StatementUploadRequest(
+                uploaded_file_id=analysis_result.uploaded_file_id,
+                account_id=str(account.id),
+                column_mapping=analysis_result.column_mapping,
+                header_row_index=analysis_result.header_row_index,
+                data_start_row_index=analysis_result.data_start_row_index,
+            ),
+            background_tasks=MagicMock(),
+            internal_deps=dependencies,
+        )
+
+        assert upload_result.transactions_saved == 3
+
+        statement = db_session.query(Statement).filter(Statement.account_id == account.id).first()
+        transactions = db_session.query(Transaction).filter(Transaction.statement_id == statement.id).all()
+
+        amounts = sorted(float(t.amount) for t in transactions)
+        assert amounts == [-10.40, 19.80, 51.27], "European decimals must survive the whole pipeline"
+        assert round(sum(amounts), 2) == 60.67
+
+        dates = {t.date.strftime("%Y-%m-%d") for t in transactions}
+        assert dates == {"2026-11-08", "2026-11-01", "2026-10-27"}
+
     def test_reupload_same_tsv_detects_duplicates_and_remembers_account(self, db_session, llm_client, test_user):
         """Re-uploading the same TSV should recognise the file (account memory) and dedupe every row."""
 
