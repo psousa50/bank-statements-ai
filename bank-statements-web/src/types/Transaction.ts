@@ -83,8 +83,9 @@ export interface Transaction {
   category_id?: string
   categorization_status: CategorizationStatus
   running_balance?: number
-  counterparty_account_id?: string
-  counterparty_status?: 'UNPROCESSED' | 'INFERRED' | 'CONFIRMED'
+  counterparty_id?: string
+  transfer_account_id?: string
+  other_side_status?: 'UNPROCESSED' | 'RULE_BASED' | 'MANUAL' | 'FAILURE'
   tags?: Tag[]
   exclude_from_analytics: boolean
   is_split_parent: boolean
@@ -98,7 +99,8 @@ export interface TransactionCreate {
   amount: number
   account_id: string
   category_id?: string
-  counterparty_account_id?: string
+  counterparty_id?: string
+  transfer_account_id?: string
 }
 
 export interface TransactionListResponse {

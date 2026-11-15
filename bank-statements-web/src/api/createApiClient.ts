@@ -1,6 +1,7 @@
 import { ApiClient } from './ApiClient'
 import { categoryClient } from './CategoryClient'
 import { accountClient } from './AccountClient'
+import { counterpartyClient } from './CounterpartyClient'
 import { statementClient } from './StatementClient'
 import { transactionClient } from './TransactionClient'
 import { transactionCategorizationClient } from './TransactionCategorizationClient'
@@ -20,6 +21,7 @@ export const createApiClient = (): ApiClient => {
     categories: categoryClient,
     statements: statementClient,
     accounts: accountClient,
+    counterparties: counterpartyClient,
     subscription: subscriptionClient,
     tags: tagClient,
     chatClient: createChatClient(BASE_URL),

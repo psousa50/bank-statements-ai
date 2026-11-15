@@ -24,10 +24,10 @@ class Account(Base):
         foreign_keys="Transaction.account_id",
         back_populates="account",
     )
-    counterparty_transactions = relationship(
+    transfer_transactions = relationship(
         "Transaction",
-        foreign_keys="Transaction.counterparty_account_id",
-        back_populates="counterparty_account",
+        foreign_keys="Transaction.transfer_account_id",
+        back_populates="transfer_account",
     )
     statements = relationship("Statement", back_populates="account")
 

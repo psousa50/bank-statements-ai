@@ -6,6 +6,7 @@ from app.api.routes.accounts import register_account_routes
 from app.api.routes.auth import register_auth_routes
 from app.api.routes.categories import register_category_routes
 from app.api.routes.chat import register_chat_routes
+from app.api.routes.counterparties import register_counterparty_routes
 from app.api.routes.enhancement_rules import register_enhancement_rule_routes
 from app.api.routes.filter_presets import register_filter_preset_routes
 from app.api.routes.saved_filters import register_saved_filter_routes
@@ -36,6 +37,7 @@ def register_app_routes(
     register_enhancement_rule_routes(app, provide_dependencies)
     register_category_routes(app, provide_dependencies)
     register_account_routes(app, provide_dependencies)
+    register_counterparty_routes(app, provide_dependencies)
     register_statement_routes(app, provide_dependencies)
     register_transaction_job_routes(app, provide_dependencies)
     register_saved_filter_routes(app, provide_dependencies)

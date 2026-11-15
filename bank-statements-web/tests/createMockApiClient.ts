@@ -1,6 +1,7 @@
 import { vi } from 'vitest'
 import { ApiClient } from '@/api/ApiClient'
 import { Account, AccountClient } from '@/api/AccountClient'
+import { Counterparty, CounterpartyClient } from '@/api/CounterpartyClient'
 import { FilterPresetClient } from '@/api/FilterPresetClient'
 import { SubscriptionClient, SubscriptionResponse } from '@/api/SubscriptionClient'
 import { CategoryClient, CategoryListResponse } from '@/api/CategoryClient'
@@ -103,7 +104,7 @@ const defaultTransactionClient: TransactionClient = {
     Promise.resolve({
       totals: [
         {
-          counterparty_account_id: '1',
+          counterparty_id: '1',
           total_amount: -100,
           transaction_count: 1,
         },
@@ -224,6 +225,29 @@ const defaultAccountClient: AccountClient = {
   deleteInitialBalance: () => Promise.resolve(),
   exportAccounts: () => Promise.resolve(),
   uploadAccounts: () => Promise.resolve({ accounts: [], total: 0, created: 0, updated: 0 }),
+  getConversionCandidates: () => Promise.resolve([]),
+  convertToCounterparty: () =>
+    Promise.resolve({
+      counterparty: defaultCounterparty,
+      transactions_repointed: 0,
+      rules_repointed: 0,
+    }),
+}
+
+const defaultCounterparty: Counterparty = {
+  id: 'mock-counterparty-id',
+  name: 'Mock Counterparty',
+  type: 'other',
+}
+
+const defaultCounterpartyClient: CounterpartyClient = {
+  getAll: () => Promise.resolve([defaultCounterparty]),
+  getById: () => Promise.resolve(defaultCounterparty),
+  createCounterparty: () => Promise.resolve(defaultCounterparty),
+  updateCounterparty: () => Promise.resolve(defaultCounterparty),
+  deleteCounterparty: () => Promise.resolve(),
+  exportCounterparties: () => Promise.resolve(),
+  uploadCounterparties: () => Promise.resolve({ counterparties: [], total: 0, created: 0, updated: 0 }),
 }
 
 // Default mock transaction categorization client implementation
@@ -403,6 +427,7 @@ interface ApiClientOverrides {
   transactionCategorizations?: TransactionCategorizationClientOverrides
   categories?: CategoryClientOverrides
   accounts?: AccountClientOverrides
+  counterparties?: Partial<CounterpartyClient>
   statements?: StatementClientOverrides
 }
 
@@ -424,6 +449,10 @@ export const createMockApiClient = (overrides: ApiClientOverrides = {}): ApiClie
     accounts: {
       ...defaultAccountClient,
       ...overrides.accounts,
+    },
+    counterparties: {
+      ...defaultCounterpartyClient,
+      ...overrides.counterparties,
     },
     statements: {
       ...defaultStatementClient,

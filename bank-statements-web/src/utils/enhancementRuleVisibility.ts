@@ -2,7 +2,7 @@ import { EnhancementRule, EnhancementRuleFilters } from '../types/EnhancementRul
 
 export const ruleHiddenReason = (rule: EnhancementRule, filters: EnhancementRuleFilters): string | null => {
   const status = filters.rule_status_filter
-  if (status === 'unconfigured' && (rule.category_id || rule.counterparty_account_id)) {
+  if (status === 'unconfigured' && (rule.category_id || rule.counterparty_id)) {
     return 'the "Unconfigured" filter'
   }
   if (
@@ -16,8 +16,8 @@ export const ruleHiddenReason = (rule: EnhancementRule, filters: EnhancementRule
     return 'the category filter'
   }
   if (
-    filters.counterparty_account_ids?.length &&
-    (!rule.counterparty_account_id || !filters.counterparty_account_ids.includes(rule.counterparty_account_id))
+    filters.counterparty_ids?.length &&
+    (!rule.counterparty_id || !filters.counterparty_ids.includes(rule.counterparty_id))
   ) {
     return 'the counterparty filter'
   }

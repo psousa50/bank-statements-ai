@@ -1,4 +1,5 @@
-import { Category } from './Transaction'
+import { Account, Category } from './Transaction'
+import { Counterparty } from './Counterparty'
 
 export enum EnhancementRuleSource {
   MANUAL = 'MANUAL',
@@ -31,7 +32,8 @@ export interface EnhancementRule {
   id: string
   patterns: EnhancementRulePattern[]
   category_id?: string
-  counterparty_account_id?: string
+  counterparty_id?: string
+  transfer_account_id?: string
   min_amount?: number
   max_amount?: number
   start_date?: string
@@ -43,11 +45,8 @@ export interface EnhancementRule {
   split_lines?: EnhancementRuleSplitLine[]
   // Populated from joins
   category?: Category
-  counterparty_account?: {
-    id: string
-    name: string
-    account_number?: string
-  }
+  counterparty?: Counterparty
+  transfer_account?: Account
   transaction_count?: number
   pending_transaction_count?: number
   latest_match_date?: string
@@ -59,17 +58,14 @@ export interface EnhancementRule {
   ai_counterparty_confidence?: number
   ai_processed_at?: string
   ai_suggested_category?: Category
-  ai_suggested_counterparty?: {
-    id: string
-    name: string
-    account_number?: string
-  }
+  ai_suggested_counterparty?: Counterparty
 }
 
 export interface EnhancementRuleCreate {
   patterns: EnhancementRulePattern[]
   category_id?: string
-  counterparty_account_id?: string
+  counterparty_id?: string
+  transfer_account_id?: string
   min_amount?: number
   max_amount?: number
   start_date?: string
@@ -81,7 +77,8 @@ export interface EnhancementRuleCreate {
 export interface EnhancementRuleUpdate {
   patterns: EnhancementRulePattern[]
   category_id?: string
-  counterparty_account_id?: string
+  counterparty_id?: string
+  transfer_account_id?: string
   min_amount?: number
   max_amount?: number
   start_date?: string
@@ -120,7 +117,7 @@ export interface EnhancementRuleFilters {
   page_size?: number
   description_search?: string
   category_ids?: string[]
-  counterparty_account_ids?: string[]
+  counterparty_ids?: string[]
   match_type?: MatchType
   source?: EnhancementRuleSource
   sort_field?: SortField
@@ -149,7 +146,7 @@ export interface CategoryUsage {
 }
 
 export interface CounterpartyUsage {
-  counterparty_account_id: string
+  counterparty_id: string
   counterparty_name: string
   rule_count: number
   transaction_count: number

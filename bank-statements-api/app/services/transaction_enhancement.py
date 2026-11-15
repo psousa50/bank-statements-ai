@@ -87,6 +87,9 @@ class TransactionEnhancer:
             transaction.category_id = rule.category_id
             transaction.mark_rule_based_categorization()
 
-        if rule.counterparty_account_id is not None:
-            transaction.counterparty_account_id = rule.counterparty_account_id
-            transaction.mark_rule_based_counterparty()
+        if rule.counterparty_id is not None:
+            transaction.assign_counterparty(rule.counterparty_id)
+            transaction.mark_rule_based_other_side()
+        elif rule.transfer_account_id is not None:
+            transaction.assign_transfer_account(rule.transfer_account_id)
+            transaction.mark_rule_based_other_side()

@@ -2,6 +2,8 @@ import { useState, FormEvent, useEffect, useCallback } from 'react'
 import { Category, Account, TransactionCreate, Transaction, Tag } from '../types/Transaction'
 import { CategorySelector } from './CategorySelector'
 import { AccountSelector } from './AccountSelector'
+import { OtherSideMode, OtherSideSelector, otherSideModeFor } from './OtherSideSelector'
+import { useCounterparties } from '../services/hooks/useCounterparties'
 import { useApi } from '../api/ApiContext'
 import { EnhancementPreviewResponse } from '../api/TransactionClient'
 import { TagInput } from './TagInput'
@@ -37,9 +39,18 @@ export const TransactionForm = ({
   const [amount, setAmount] = useState<string>(initialTransaction?.amount.toString() || '')
   const [accountId, setAccountId] = useState<string>(initialTransaction?.account_id || '')
   const [categoryId, setCategoryId] = useState<string>(initialTransaction?.category_id || '')
-  const [counterpartyAccountId, setCounterpartyAccountId] = useState<string>(
-    initialTransaction?.counterparty_account_id || ''
+  const { counterparties } = useCounterparties()
+  const [counterpartyId, setCounterpartyId] = useState<string>(initialTransaction?.counterparty_id || '')
+  const [transferAccountId, setTransferAccountId] = useState<string>(initialTransaction?.transfer_account_id || '')
+  const [otherSideMode, setOtherSideMode] = useState<OtherSideMode>(
+    otherSideModeFor(initialTransaction?.counterparty_id, initialTransaction?.transfer_account_id)
   )
+
+  const changeOtherSideMode = (mode: OtherSideMode) => {
+    setOtherSideMode(mode)
+    if (mode !== 'counterparty') setCounterpartyId('')
+    if (mode !== 'transfer') setTransferAccountId('')
+  }
   const [preview, setPreview] = useState<EnhancementPreviewResponse | null>(null)
 
   const fetchPreview = useCallback(async () => {
@@ -77,12 +88,20 @@ export const TransactionForm = ({
       if (preview.category_id) {
         setCategoryId(preview.category_id)
       }
-      if (preview.counterparty_account_id) {
-        setCounterpartyAccountId(preview.counterparty_account_id)
+      if (preview.counterparty_id) {
+        setCounterpartyId(preview.counterparty_id)
+        setTransferAccountId('')
+        setOtherSideMode('counterparty')
+      } else if (preview.transfer_account_id) {
+        setTransferAccountId(preview.transfer_account_id)
+        setCounterpartyId('')
+        setOtherSideMode('transfer')
       }
     } else if (preview && !preview.matched) {
       setCategoryId('')
-      setCounterpartyAccountId('')
+      setCounterpartyId('')
+      setTransferAccountId('')
+      setOtherSideMode('none')
     }
   }, [preview])
 
@@ -106,7 +125,8 @@ export const TransactionForm = ({
       amount: amountValue,
       account_id: accountId,
       category_id: categoryId || undefined,
-      counterparty_account_id: counterpartyAccountId || undefined,
+      counterparty_id: counterpartyId || undefined,
+      transfer_account_id: transferAccountId || undefined,
     }
 
     await onSubmit(transaction)
@@ -117,7 +137,9 @@ export const TransactionForm = ({
       setAmount('')
       setAccountId('')
       setCategoryId('')
-      setCounterpartyAccountId('')
+      setCounterpartyId('')
+      setTransferAccountId('')
+      setOtherSideMode('none')
       setPreview(null)
     }
   }
@@ -164,12 +186,17 @@ export const TransactionForm = ({
         </div>
 
         <div className="form-group">
-          <label htmlFor="counterparty">Counterparty Account (optional)</label>
-          <AccountSelector
+          <label>Other side (optional)</label>
+          <OtherSideSelector
+            mode={otherSideMode}
+            onModeChange={changeOtherSideMode}
             accounts={accounts}
-            selectedAccountId={counterpartyAccountId}
-            onAccountChange={setCounterpartyAccountId}
-            placeholder="Select counterparty account for transfers"
+            counterparties={counterparties}
+            counterpartyId={counterpartyId}
+            transferAccountId={transferAccountId}
+            onCounterpartyChange={setCounterpartyId}
+            onTransferAccountChange={setTransferAccountId}
+            excludeAccountId={accountId}
           />
         </div>
 

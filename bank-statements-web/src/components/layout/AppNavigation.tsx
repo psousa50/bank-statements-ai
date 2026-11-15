@@ -8,6 +8,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import AccountTreeIcon from '@mui/icons-material/AccountTree'
 import LocalOfferIcon from '@mui/icons-material/LocalOffer'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
+import GroupIcon from '@mui/icons-material/Group'
 import DescriptionIcon from '@mui/icons-material/Description'
 import RepeatIcon from '@mui/icons-material/Repeat'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
@@ -59,6 +60,7 @@ const navSections: NavSection[] = [
       { path: '/tags', label: 'Tags', icon: <LocalOfferIcon /> },
       { path: '/enhancement-rules', label: 'Enhancement Rules', icon: <AutoFixHighIcon /> },
       { path: '/accounts', label: 'Accounts', icon: <AccountBalanceIcon /> },
+      { path: '/counterparties', label: 'Counterparties', icon: <GroupIcon /> },
       { path: '/settings/billing', label: 'Billing', icon: <PaymentIcon /> },
     ],
   },

@@ -51,8 +51,8 @@ export const enhancementRuleClient: EnhancementRuleClient = {
     if (filters?.category_ids && filters.category_ids.length > 0) {
       filters.category_ids.forEach((id) => params.append('category_ids', id))
     }
-    if (filters?.counterparty_account_ids && filters.counterparty_account_ids.length > 0) {
-      filters.counterparty_account_ids.forEach((id) => params.append('counterparty_account_ids', id))
+    if (filters?.counterparty_ids && filters.counterparty_ids.length > 0) {
+      filters.counterparty_ids.forEach((id) => params.append('counterparty_ids', id))
     }
     if (filters?.match_type) {
       params.append('match_type', filters.match_type)

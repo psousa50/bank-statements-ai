@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 
 from app.domain.dto.statement_processing import FilterOperator, LogicalOperator
 from app.domain.models.background_job import JobStatus
+from app.domain.models.counterparty import CounterpartyType
 from app.domain.models.enhancement_rule import EnhancementRuleSource, MatchType
 from app.domain.models.processing import BackgroundJobInfo
 from app.domain.models.subscription import SubscriptionStatus, SubscriptionTier
@@ -181,22 +182,90 @@ class AccountUploadResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CounterpartyBase(BaseModel):
+    name: str
+    type: CounterpartyType = CounterpartyType.OTHER
+
+
+class CounterpartyCreate(CounterpartyBase):
+    pass
+
+
+class CounterpartyUpdate(CounterpartyBase):
+    pass
+
+
+class CounterpartyResponse(BaseModel):
+    id: UUID
+    name: str
+    type: CounterpartyType
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CounterpartyListResponse(BaseModel):
+    counterparties: Sequence[CounterpartyResponse]
+    total: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CounterpartyUploadResponse(BaseModel):
+    counterparties: Sequence[CounterpartyResponse]
+    total: int
+    created: int
+    updated: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OtherSideExclusivity(BaseModel):
+    @model_validator(mode="after")
+    def validate_single_other_side(self):
+        if self.counterparty_id is not None and self.transfer_account_id is not None:
+            raise ValueError("Set either counterparty_id or transfer_account_id, not both")
+        return self
+
+
+class AccountConversionRequest(BaseModel):
+    type: CounterpartyType = CounterpartyType.OTHER
+
+
+class AccountConversionResponse(BaseModel):
+    counterparty: CounterpartyResponse
+    transactions_repointed: int
+    rules_repointed: int
+
+
+class AccountConversionCandidateResponse(BaseModel):
+    account_id: UUID
+    name: str
+    referenced_as_other_side: int
+
+
+class AccountConversionCandidateListResponse(BaseModel):
+    candidates: Sequence[AccountConversionCandidateResponse]
+    total: int
+
+
 class TransactionBase(BaseModel):
     date: date
     description: str
     amount: Decimal = Field(..., ge=-1000000, le=1000000)
 
 
-class TransactionCreate(TransactionBase):
+class TransactionCreate(TransactionBase, OtherSideExclusivity):
     category_id: Optional[UUID] = None
     account_id: UUID
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
 
 
-class TransactionUpdate(TransactionBase):
+class TransactionUpdate(TransactionBase, OtherSideExclusivity):
     category_id: Optional[UUID] = None
     account_id: UUID
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
 
 
 class TransactionResponse(BaseModel):
@@ -208,7 +277,8 @@ class TransactionResponse(BaseModel):
     created_at: date
     category_id: Optional[UUID] = None
     account_id: Optional[UUID] = None
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
     categorization_status: CategorizationStatus
     running_balance: Optional[Decimal] = None
     row_index: Optional[int] = None
@@ -241,13 +311,14 @@ class TransactionSplitRequest(BaseModel):
     parts: List[TransactionSplitPartRequest] = Field(..., min_length=2)
 
 
-class TransactionCreateRequest(BaseModel):
+class TransactionCreateRequest(OtherSideExclusivity):
     date: date
     description: str
     amount: Decimal
     account_id: UUID
     category_id: Optional[UUID] = None
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
     after_transaction_id: Optional[UUID] = None
 
 
@@ -262,17 +333,20 @@ class EnhancementPreviewResponse(BaseModel):
     rule_pattern: Optional[str] = None
     category_id: Optional[UUID] = None
     category_name: Optional[str] = None
-    counterparty_account_id: Optional[UUID] = None
-    counterparty_account_name: Optional[str] = None
+    counterparty_id: Optional[UUID] = None
+    counterparty_name: Optional[str] = None
+    transfer_account_id: Optional[UUID] = None
+    transfer_account_name: Optional[str] = None
 
 
-class TransactionUpdateRequest(BaseModel):
+class TransactionUpdateRequest(OtherSideExclusivity):
     date: date
     description: str
     amount: Decimal
     account_id: UUID
     category_id: Optional[UUID] = None
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
 
 
 class ExcludeFromAnalyticsRequest(BaseModel):
@@ -286,7 +360,8 @@ class TransactionFilters(BaseModel):
     max_amount: Optional[Decimal] = None
     description_search: Optional[str] = None
     account_id: Optional[UUID] = None
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     transaction_ids: Optional[List[UUID]] = None
@@ -328,7 +403,7 @@ class CategoryTotalsResponse(BaseModel):
 
 
 class CounterpartyTotalResponse(BaseModel):
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
     total_amount: Decimal
     transaction_count: int
 
@@ -683,10 +758,11 @@ class EnhancementRulePatternResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class EnhancementRuleBase(BaseModel):
+class EnhancementRuleBase(OtherSideExclusivity):
     patterns: List[EnhancementRulePatternInput] = Field(..., min_length=1)
     category_id: Optional[UUID] = None
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
     min_amount: Optional[Decimal] = None
     max_amount: Optional[Decimal] = None
     start_date: Optional[str] = None
@@ -701,7 +777,7 @@ class EnhancementRuleBase(BaseModel):
 
 
 class EnhancementRuleCreate(EnhancementRuleBase):
-    @field_validator("category_id", "counterparty_account_id")
+    @field_validator("category_id", "counterparty_id")
     @classmethod
     def validate_at_least_one_enhancement(cls, v, info):
         # This will be validated in the service layer instead
@@ -722,7 +798,8 @@ class EnhancementRuleResponse(BaseModel):
     id: UUID
     patterns: List[EnhancementRulePatternResponse] = []
     category_id: Optional[UUID] = None
-    counterparty_account_id: Optional[UUID] = None
+    counterparty_id: Optional[UUID] = None
+    transfer_account_id: Optional[UUID] = None
     min_amount: Optional[Decimal] = None
     max_amount: Optional[Decimal] = None
     start_date: Optional[str] = None
@@ -733,7 +810,8 @@ class EnhancementRuleResponse(BaseModel):
     rule_type: str
     # Optional populated fields
     category: Optional[CategoryResponse] = None
-    counterparty_account: Optional[AccountResponse] = None
+    counterparty: Optional[CounterpartyResponse] = None
+    transfer_account: Optional[AccountResponse] = None
     transaction_count: Optional[int] = None
     pending_transaction_count: Optional[int] = None
     latest_match_date: Optional[date] = None
@@ -746,7 +824,7 @@ class EnhancementRuleResponse(BaseModel):
     ai_counterparty_confidence: Optional[Decimal] = None
     ai_processed_at: Optional[datetime] = None
     ai_suggested_category: Optional[CategoryResponse] = None
-    ai_suggested_counterparty: Optional[AccountResponse] = None
+    ai_suggested_counterparty: Optional[CounterpartyResponse] = None
     split_lines: List[EnhancementRuleSplitLineResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

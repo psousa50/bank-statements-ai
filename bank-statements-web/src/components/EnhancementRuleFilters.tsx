@@ -15,6 +15,7 @@ import {
 import ClearIcon from '@mui/icons-material/Clear'
 import { useApi } from '../api/ApiContext'
 import { EnhancementRuleFilters, EnhancementRuleSource, MatchType, RuleStatusFilter } from '../types/EnhancementRule'
+import { Counterparty, COUNTERPARTY_TYPE_LABELS } from '../types/Counterparty'
 import { Category } from '../types/Transaction'
 import { CategorySelector } from './CategorySelector'
 
@@ -24,12 +25,6 @@ interface EnhancementRuleFiltersProps {
   loading?: boolean
 }
 
-interface CounterpartyAccount {
-  id: string
-  name: string
-  account_number?: string
-}
-
 export const EnhancementRuleFiltersComponent: React.FC<EnhancementRuleFiltersProps> = ({
   filters,
   onFiltersChange,
@@ -37,7 +32,7 @@ export const EnhancementRuleFiltersComponent: React.FC<EnhancementRuleFiltersPro
 }) => {
   const apiClient = useApi()
   const [categories, setCategories] = useState<Category[]>([])
-  const [counterpartyAccounts, setCounterpartyAccounts] = useState<CounterpartyAccount[]>([])
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([])
   const [localDescriptionSearch, setLocalDescriptionSearch] = useState(filters.description_search || '')
 
   const filtersRef = useRef(filters)
@@ -57,17 +52,16 @@ export const EnhancementRuleFiltersComponent: React.FC<EnhancementRuleFiltersPro
       }
     }
 
-    const loadCounterpartyAccounts = async () => {
+    const loadCounterparties = async () => {
       try {
-        const response = await apiClient.accounts.getAll()
-        setCounterpartyAccounts(response)
+        setCounterparties(await apiClient.counterparties.getAll())
       } catch (err) {
-        console.error('Failed to load counterparty accounts:', err)
+        console.error('Failed to load counterparties:', err)
       }
     }
 
     loadCategories()
-    loadCounterpartyAccounts()
+    loadCounterparties()
   }, [apiClient])
 
   // Debounce description search
@@ -108,7 +102,7 @@ export const EnhancementRuleFiltersComponent: React.FC<EnhancementRuleFiltersPro
     const value = event.target.value
     onFiltersChange({
       ...filters,
-      counterparty_account_ids: typeof value === 'string' ? [] : value.length ? value : undefined,
+      counterparty_ids: typeof value === 'string' ? [] : value.length ? value : undefined,
     })
   }
 
@@ -145,7 +139,7 @@ export const EnhancementRuleFiltersComponent: React.FC<EnhancementRuleFiltersPro
   const hasActiveFilters =
     filters.description_search ||
     filters.category_ids?.length ||
-    filters.counterparty_account_ids?.length ||
+    filters.counterparty_ids?.length ||
     filters.match_type ||
     filters.source ||
     filters.rule_status_filter
@@ -209,23 +203,22 @@ export const EnhancementRuleFiltersComponent: React.FC<EnhancementRuleFiltersPro
             <InputLabel>Counterparties</InputLabel>
             <Select
               multiple
-              value={filters.counterparty_account_ids || []}
+              value={filters.counterparty_ids || []}
               onChange={handleCounterpartyChange}
               input={<OutlinedInput label="Counterparties" />}
               disabled={loading}
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {selected.map((value) => {
-                    const account = counterpartyAccounts.find((a) => a.id === value)
-                    return <Chip key={value} label={account?.name || value} size="small" />
+                    const counterparty = counterparties.find((c) => c.id === value)
+                    return <Chip key={value} label={counterparty?.name || value} size="small" />
                   })}
                 </Box>
               )}
             >
-              {counterpartyAccounts.map((account) => (
-                <MenuItem key={account.id} value={account.id}>
-                  {account.name}
-                  {account.account_number && ` (${account.account_number})`}
+              {counterparties.map((counterparty) => (
+                <MenuItem key={counterparty.id} value={counterparty.id}>
+                  {counterparty.name} ({COUNTERPARTY_TYPE_LABELS[counterparty.type]})
                 </MenuItem>
               ))}
             </Select>

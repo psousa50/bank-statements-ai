@@ -17,7 +17,7 @@ class TestTransactionEnhancer:
         amount: Decimal = Decimal("100.00"),
         transaction_date: date = date(2024, 1, 1),
         category_id: uuid.UUID = None,
-        counterparty_account_id: uuid.UUID = None,
+        counterparty_id: uuid.UUID = None,
     ) -> Transaction:
         """Helper method to create test transactions"""
         transaction = Transaction()
@@ -26,7 +26,7 @@ class TestTransactionEnhancer:
         transaction.amount = amount
         transaction.date = transaction_date
         transaction.category_id = category_id
-        transaction.counterparty_account_id = counterparty_account_id
+        transaction.counterparty_id = counterparty_id
         transaction.categorization_status = CategorizationStatus.UNCATEGORIZED
         return transaction
 
@@ -35,7 +35,7 @@ class TestTransactionEnhancer:
         pattern: str = "test",
         match_type: MatchType = MatchType.EXACT,
         category_id: uuid.UUID = None,
-        counterparty_account_id: uuid.UUID = None,
+        counterparty_id: uuid.UUID = None,
         min_amount: Decimal = None,
         max_amount: Decimal = None,
         start_date: date = None,
@@ -54,7 +54,7 @@ class TestTransactionEnhancer:
             )
         ]
         rule.category_id = category_id
-        rule.counterparty_account_id = counterparty_account_id
+        rule.counterparty_id = counterparty_id
         rule.min_amount = min_amount
         rule.max_amount = max_amount
         rule.start_date = start_date
@@ -72,13 +72,13 @@ class TestTransactionEnhancer:
         """Test that empty rules list leaves transactions unchanged"""
         transaction = self.create_transaction()
         original_category_id = transaction.category_id
-        original_counterparty_id = transaction.counterparty_account_id
+        original_counterparty_id = transaction.counterparty_id
 
         result = self.enhancer.apply_rules([transaction], [])
 
         assert len(result) == 1
         assert result[0].category_id == original_category_id
-        assert result[0].counterparty_account_id == original_counterparty_id
+        assert result[0].counterparty_id == original_counterparty_id
 
     def test_exact_match_rule_applies(self):
         """Test that exact match rule is applied correctly"""
@@ -90,14 +90,14 @@ class TestTransactionEnhancer:
             pattern="starbucks coffee",
             match_type=MatchType.EXACT,
             category_id=category_id,
-            counterparty_account_id=counterparty_id,
+            counterparty_id=counterparty_id,
         )
 
         result = self.enhancer.apply_rules([transaction], [rule])
 
         assert len(result) == 1
         assert result[0].category_id == category_id
-        assert result[0].counterparty_account_id == counterparty_id
+        assert result[0].counterparty_id == counterparty_id
         assert result[0].categorization_status == CategorizationStatus.RULE_BASED
 
     def test_exact_match_rule_does_not_apply_when_no_match(
@@ -402,18 +402,18 @@ class TestTransactionEnhancer:
             pattern="test",
             match_type=MatchType.EXACT,
             category_id=category_id,
-            counterparty_account_id=None,
+            counterparty_id=None,
         )
 
         result = self.enhancer.apply_rules([transaction], [rule])
 
         assert len(result) == 1
         assert result[0].category_id == category_id
-        assert result[0].counterparty_account_id is None
+        assert result[0].counterparty_id is None
         assert result[0].categorization_status == CategorizationStatus.RULE_BASED
 
     def test_counterparty_only_rule_applies(self):
-        """Test that rule with only counterparty_account_id applies correctly"""
+        """Test that rule with only counterparty_id applies correctly"""
         counterparty_id = uuid.uuid4()
 
         transaction = self.create_transaction(normalized_description="test")
@@ -421,21 +421,21 @@ class TestTransactionEnhancer:
             pattern="test",
             match_type=MatchType.EXACT,
             category_id=None,
-            counterparty_account_id=counterparty_id,
+            counterparty_id=counterparty_id,
         )
 
         result = self.enhancer.apply_rules([transaction], [rule])
 
         assert len(result) == 1
         assert result[0].category_id is None
-        assert result[0].counterparty_account_id == counterparty_id
+        assert result[0].counterparty_id == counterparty_id
         # Should not mark as categorized if only counterparty is set
         assert result[0].categorization_status == CategorizationStatus.UNCATEGORIZED
 
     def test_both_category_and_counterparty_rule_applies(
         self,
     ):
-        """Test that rule with both category_id and counterparty_account_id applies correctly"""
+        """Test that rule with both category_id and counterparty_id applies correctly"""
         category_id = uuid.uuid4()
         counterparty_id = uuid.uuid4()
 
@@ -444,12 +444,12 @@ class TestTransactionEnhancer:
             pattern="test",
             match_type=MatchType.EXACT,
             category_id=category_id,
-            counterparty_account_id=counterparty_id,
+            counterparty_id=counterparty_id,
         )
 
         result = self.enhancer.apply_rules([transaction], [rule])
 
         assert len(result) == 1
         assert result[0].category_id == category_id
-        assert result[0].counterparty_account_id == counterparty_id
+        assert result[0].counterparty_id == counterparty_id
         assert result[0].categorization_status == CategorizationStatus.RULE_BASED

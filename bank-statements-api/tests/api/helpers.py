@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.adapters.repositories.account import SQLAlchemyAccountRepository
 from app.adapters.repositories.background_job import SQLAlchemyBackgroundJobRepository
 from app.adapters.repositories.category import SQLAlchemyCategoryRepository
+from app.adapters.repositories.counterparty import SQLAlchemyCounterpartyRepository
 from app.adapters.repositories.enhancement_rule import SQLAlchemyEnhancementRuleRepository
 from app.adapters.repositories.filter_preset import SQLAlchemyFilterPresetRepository
 from app.adapters.repositories.saved_filter import SQLAlchemySavedFilterRepository
@@ -18,11 +19,13 @@ from app.app import register_app_routes
 from app.core.dependencies import InternalDependencies
 from app.domain.models.user import User
 from app.services.account import AccountService
+from app.services.account_conversion import AccountConversionService
 from app.services.ai import LLMRuleCategorizer, LLMRuleCounterparty
 from app.services.ai.llm_category_generator import LLMCategoryGenerator
 from app.services.background.background_job_service import BackgroundJobService
 from app.services.category import CategoryService
 from app.services.chat import ChatService
+from app.services.counterparty import CounterpartyService
 from app.services.enhancement_rule_management import EnhancementRuleManagementService
 from app.services.initial_balance_service import InitialBalanceService
 from app.services.recurring_expense_analyzer import RecurringExpenseAnalyzer
@@ -64,6 +67,9 @@ def mocked_dependencies(
     transaction_enhancer: TransactionEnhancer = None,
     category_repository: SQLAlchemyCategoryRepository = None,
     account_repository: SQLAlchemyAccountRepository = None,
+    counterparty_repository: SQLAlchemyCounterpartyRepository = None,
+    counterparty_service: CounterpartyService = None,
+    account_conversion_service: AccountConversionService = None,
     recurring_expense_analyzer: RecurringExpenseAnalyzer = None,
     saved_filter_repository: SQLAlchemySavedFilterRepository = None,
     filter_preset_repository: SQLAlchemyFilterPresetRepository = None,
@@ -84,6 +90,8 @@ def mocked_dependencies(
         transaction_service=transaction_service,
         category_service=category_service or MagicMock(spec=CategoryService),
         account_service=account_service or MagicMock(spec=AccountService),
+        counterparty_service=counterparty_service or MagicMock(spec=CounterpartyService),
+        account_conversion_service=account_conversion_service or MagicMock(spec=AccountConversionService),
         initial_balance_service=initial_balance_service,
         statement_service=statement_service or MagicMock(spec=StatementService),
         statement_analyzer_service=statement_analyzer_service or MagicMock(spec=StatementAnalyzerService),
@@ -98,6 +106,7 @@ def mocked_dependencies(
         transaction_enhancer=transaction_enhancer or MagicMock(spec=TransactionEnhancer),
         category_repository=category_repository or MagicMock(spec=SQLAlchemyCategoryRepository),
         account_repository=account_repository or MagicMock(spec=SQLAlchemyAccountRepository),
+        counterparty_repository=counterparty_repository or MagicMock(spec=SQLAlchemyCounterpartyRepository),
         recurring_expense_analyzer=recurring_expense_analyzer or MagicMock(spec=RecurringExpenseAnalyzer),
         saved_filter_repository=saved_filter_repository or MagicMock(spec=SQLAlchemySavedFilterRepository),
         filter_preset_repository=filter_preset_repository or MagicMock(spec=SQLAlchemyFilterPresetRepository),

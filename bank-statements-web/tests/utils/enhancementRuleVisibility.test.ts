@@ -14,7 +14,7 @@ const createRule = (overrides: Partial<EnhancementRule> = {}): EnhancementRule =
 
 describe('ruleHiddenReason', () => {
   test('configured rule is hidden by the unconfigured filter', () => {
-    const rule = createRule({ category_id: 'cat-1', counterparty_account_id: 'acc-1' })
+    const rule = createRule({ category_id: 'cat-1', counterparty_id: 'acc-1' })
     const filters: EnhancementRuleFilters = { rule_status_filter: 'unconfigured' }
 
     expect(ruleHiddenReason(rule, filters)).toBe('the "Unconfigured" filter')
@@ -42,8 +42,8 @@ describe('ruleHiddenReason', () => {
   })
 
   test('rule is hidden when its counterparty is not in the counterparty filter', () => {
-    const rule = createRule({ counterparty_account_id: 'acc-1' })
-    const filters: EnhancementRuleFilters = { counterparty_account_ids: ['acc-2'] }
+    const rule = createRule({ counterparty_id: 'acc-1' })
+    const filters: EnhancementRuleFilters = { counterparty_ids: ['acc-2'] }
 
     expect(ruleHiddenReason(rule, filters)).toBe('the counterparty filter')
   })
@@ -79,7 +79,7 @@ describe('ruleHiddenReason', () => {
   })
 
   test('no filters means never hidden', () => {
-    const rule = createRule({ category_id: 'cat-1', counterparty_account_id: 'acc-1' })
+    const rule = createRule({ category_id: 'cat-1', counterparty_id: 'acc-1' })
 
     expect(ruleHiddenReason(rule, {})).toBeNull()
   })

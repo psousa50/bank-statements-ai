@@ -11,6 +11,10 @@ class EnhancementRuleRepository(ABC):
         pass
 
     @abstractmethod
+    def repoint_transfer_account_to_counterparty(self, account_id: UUID, counterparty_id: UUID, user_id: UUID) -> int:
+        pass
+
+    @abstractmethod
     def save(self, rule: EnhancementRule) -> EnhancementRule:
         pass
 

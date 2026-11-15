@@ -15,7 +15,7 @@ def _make_rule(
     match_type: MatchType,
     *,
     category_id=None,
-    counterparty_account_id=None,
+    counterparty_id=None,
     min_amount=None,
     max_amount=None,
     source: EnhancementRuleSource = EnhancementRuleSource.MANUAL,
@@ -23,7 +23,7 @@ def _make_rule(
     rule = EnhancementRule(
         id=uuid4(),
         category_id=category_id,
-        counterparty_account_id=counterparty_account_id,
+        counterparty_id=counterparty_id,
         min_amount=min_amount,
         max_amount=max_amount,
         source=source,
@@ -85,9 +85,7 @@ class TestTransactionRuleEnhancementService:
     @pytest.fixture
     def sample_enhancement_rules(self):
         return [
-            _make_rule(
-                "grocery store purchase", MatchType.EXACT, category_id="category-1", counterparty_account_id="counterparty-1"
-            ),
+            _make_rule("grocery store purchase", MatchType.EXACT, category_id="category-1", counterparty_id="counterparty-1"),
             _make_rule("salary", MatchType.PREFIX, category_id="category-2", source=EnhancementRuleSource.AUTO),
         ]
 
@@ -125,18 +123,18 @@ class TestTransactionRuleEnhancementService:
         grocery_dto = next(dto for dto in result.enhanced_dtos if "grocery" in dto.description.lower())
         assert grocery_dto.category_id == "category-1"
         assert grocery_dto.categorization_status == CategorizationStatus.RULE_BASED
-        assert grocery_dto.counterparty_account_id == "counterparty-1"
+        assert grocery_dto.counterparty_id == "counterparty-1"
         assert grocery_dto.normalized_description == "grocery store purchase"
 
         salary_dto = next(dto for dto in result.enhanced_dtos if "salary" in dto.description.lower())
         assert salary_dto.category_id == "category-2"
         assert salary_dto.categorization_status == CategorizationStatus.RULE_BASED
-        assert salary_dto.counterparty_account_id is None
+        assert salary_dto.counterparty_id is None
 
         atm_dto = next(dto for dto in result.enhanced_dtos if "atm" in dto.description.lower())
         assert atm_dto.category_id is None
         assert atm_dto.categorization_status == CategorizationStatus.UNCATEGORIZED
-        assert atm_dto.counterparty_account_id is None
+        assert atm_dto.counterparty_id is None
 
     def test_enhance_transactions_no_matches(
         self,
@@ -158,7 +156,7 @@ class TestTransactionRuleEnhancementService:
         for dto in result.enhanced_dtos:
             assert dto.category_id is None
             assert dto.categorization_status == CategorizationStatus.UNCATEGORIZED
-            assert dto.counterparty_account_id is None
+            assert dto.counterparty_id is None
             assert dto.normalized_description is not None
 
     def test_enhance_transactions_creates_unmatched_rules(
@@ -181,7 +179,7 @@ class TestTransactionRuleEnhancementService:
             rule = call[0][0]
             assert isinstance(rule, EnhancementRule)
             assert rule.category_id is None
-            assert rule.counterparty_account_id is None
+            assert rule.counterparty_id is None
             assert rule.source == EnhancementRuleSource.AUTO
             assert rule.patterns[0].match_type == MatchType.EXACT
 

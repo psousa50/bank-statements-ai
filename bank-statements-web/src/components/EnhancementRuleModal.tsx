@@ -14,12 +14,14 @@ import {
   Alert,
   CircularProgress,
   FormHelperText,
+  ListSubheader,
   Typography,
   Box,
   Checkbox,
   FormControlLabel,
 } from '@mui/material'
 import { useApi } from '../api/ApiContext'
+import { Counterparty, COUNTERPARTY_TYPE_LABELS } from '../types/Counterparty'
 import { useEnhancementRules } from '../services/hooks/useEnhancementRules'
 import {
   EnhancementRule,
@@ -36,7 +38,7 @@ import Radio from '@mui/material/Radio'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { getErrorMessage } from '../types/ApiError'
-import { Category } from '../types/Transaction'
+import { Account, Category } from '../types/Transaction'
 import { hasRuleConstraints } from '../utils/enhancementRuleConstraints'
 import { buildPreviewMessage } from '../utils/enhancementRulePreviewMessage'
 import { CategorySelector } from './CategorySelector'
@@ -95,12 +97,6 @@ function toStorageAmounts(
   return { min_amount: displayMin, max_amount: displayMax }
 }
 
-interface CounterpartyAccount {
-  id: string
-  name: string
-  account_number?: string
-}
-
 export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
   open,
   rule,
@@ -113,7 +109,8 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
 
   const isEditing = !!rule?.id
   const [categories, setCategories] = useState<Category[]>([])
-  const [counterpartyAccounts, setCounterpartyAccounts] = useState<CounterpartyAccount[]>([])
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
   type FormData = Omit<EnhancementRuleCreate, 'patterns'> & { apply_to_existing?: boolean }
   const [formData, setFormData] = useState<FormData>({
     source: EnhancementRuleSource.MANUAL,
@@ -155,7 +152,8 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
       setDisplayMaxAmount(displayMax)
       setFormData({
         category_id: rule.category_id,
-        counterparty_account_id: rule.counterparty_account_id,
+        counterparty_id: rule.counterparty_id,
+        transfer_account_id: rule.transfer_account_id,
         min_amount: rule.min_amount,
         max_amount: rule.max_amount,
         start_date: rule.start_date,
@@ -181,7 +179,8 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
       setDisplayMaxAmount(displayMax)
       setFormData({
         category_id: duplicateData.category_id,
-        counterparty_account_id: duplicateData.counterparty_account_id,
+        counterparty_id: duplicateData.counterparty_id,
+        transfer_account_id: duplicateData.transfer_account_id,
         min_amount: duplicateData.min_amount,
         max_amount: duplicateData.max_amount,
         start_date: duplicateData.start_date,
@@ -207,15 +206,32 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
     }
   }, [rule, duplicateData])
 
+  const otherSideValue = formData.counterparty_id
+    ? `counterparty:${formData.counterparty_id}`
+    : formData.transfer_account_id
+      ? `transfer:${formData.transfer_account_id}`
+      : ''
+
+  const handleOtherSideChange = (value: string) => {
+    const [kind, id] = value.split(':')
+    setFormData((previous) => ({
+      ...previous,
+      counterparty_id: kind === 'counterparty' ? id : undefined,
+      transfer_account_id: kind === 'transfer' ? id : undefined,
+    }))
+  }
+
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [categoriesResponse, accountsResponse] = await Promise.all([
+        const [categoriesResponse, accountsResponse, counterpartiesResponse] = await Promise.all([
           apiClient.categories.getAll(),
           apiClient.accounts.getAll(),
+          apiClient.counterparties.getAll(),
         ])
         setCategories(categoriesResponse.categories)
-        setCounterpartyAccounts(accountsResponse)
+        setAccounts(accountsResponse)
+        setCounterparties(counterpartiesResponse)
       } catch (err) {
         console.error('Failed to load data:', err)
       }
@@ -231,13 +247,14 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
     if (!isEditing || !rule) return
 
     const categoryChanged = formData.category_id !== rule.category_id
-    const counterpartyChanged = formData.counterparty_account_id !== rule.counterparty_account_id
+    const counterpartyChanged =
+      formData.counterparty_id !== rule.counterparty_id || formData.transfer_account_id !== rule.transfer_account_id
 
     // Auto-check if significant changes are made
     if (categoryChanged || counterpartyChanged) {
       setApplyToExisting(true)
     }
-  }, [formData.category_id, formData.counterparty_account_id, isEditing, rule])
+  }, [formData.category_id, formData.counterparty_id, isEditing, rule])
 
   // Sync display amounts to formData (convert based on amountType)
   useEffect(() => {
@@ -291,7 +308,7 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
     open,
     patterns,
     formData.category_id,
-    formData.counterparty_account_id,
+    formData.counterparty_id,
     formData.min_amount,
     formData.max_amount,
     formData.start_date,
@@ -455,7 +472,8 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
         }
 
         if (formData.category_id) cleanedData.category_id = formData.category_id
-        if (formData.counterparty_account_id) cleanedData.counterparty_account_id = formData.counterparty_account_id
+        if (formData.counterparty_id) cleanedData.counterparty_id = formData.counterparty_id
+        if (formData.transfer_account_id) cleanedData.transfer_account_id = formData.transfer_account_id
         if (formData.min_amount !== undefined && formData.min_amount !== null)
           cleanedData.min_amount = formData.min_amount
         if (formData.max_amount !== undefined && formData.max_amount !== null)
@@ -677,21 +695,27 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
             </Box>
 
             <FormControl sx={{ flex: 1 }} size="small">
-              <InputLabel>Counterparty Account (Optional)</InputLabel>
+              <InputLabel>Other Side (Optional)</InputLabel>
               <Select
-                value={formData.counterparty_account_id || ''}
-                label="Counterparty Account (Optional)"
-                onChange={(e) => handleFieldChange('counterparty_account_id', e.target.value || undefined)}
+                value={otherSideValue}
+                label="Other Side (Optional)"
+                onChange={(e) => handleOtherSideChange(e.target.value)}
               >
                 <MenuItem value="">None</MenuItem>
-                {counterpartyAccounts.map((account) => (
-                  <MenuItem key={account.id} value={account.id}>
+                <ListSubheader>Counterparties</ListSubheader>
+                {counterparties.map((counterparty) => (
+                  <MenuItem key={counterparty.id} value={`counterparty:${counterparty.id}`}>
+                    {counterparty.name} ({COUNTERPARTY_TYPE_LABELS[counterparty.type]})
+                  </MenuItem>
+                ))}
+                <ListSubheader>Transfer to my own account</ListSubheader>
+                {accounts.map((account) => (
+                  <MenuItem key={account.id} value={`transfer:${account.id}`}>
                     {account.name}
-                    {account.account_number && ` (${account.account_number})`}
                   </MenuItem>
                 ))}
               </Select>
-              <FormHelperText>Counterparty to assign to matching transactions</FormHelperText>
+              <FormHelperText>A counterparty or one of your own accounts, not both</FormHelperText>
             </FormControl>
           </Stack>
 
@@ -873,7 +897,7 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
                   ❌ Preview failed: {previewError}
                   <br />
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    You may need to select a category or counterparty account for the rule to work.
+                    You may need to select a category or other side for the rule to work.
                   </Typography>
                 </Alert>
               )}
@@ -888,7 +912,7 @@ export const EnhancementRuleModal: React.FC<EnhancementRuleModalProps> = ({
                     wouldUpdate: matchingCount.count,
                     isEditing,
                     applyToExisting,
-                    hasAction: !!(formData.category_id || formData.counterparty_account_id),
+                    hasAction: !!(formData.category_id || formData.counterparty_id || formData.transfer_account_id),
                   })
                   return (
                     <Alert severity={message.severity} sx={{ mt: 1 }}>

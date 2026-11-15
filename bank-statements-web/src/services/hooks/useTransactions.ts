@@ -102,7 +102,7 @@ export const useTransactions = () => {
       amount: number
       account_id: string
       category_id?: string
-      counterparty_account_id?: string
+      counterparty_id?: string
     }) => {
       return api.transactions.create(transactionData)
     },
@@ -124,7 +124,7 @@ export const useTransactions = () => {
         amount: number
         account_id: string
         category_id?: string
-        counterparty_account_id?: string
+        counterparty_id?: string
       }
     }) => {
       return api.transactions.update(id, data)
@@ -204,7 +204,7 @@ export const useTransactions = () => {
       amount: number
       account_id: string
       category_id?: string
-      counterparty_account_id?: string
+      counterparty_id?: string
     }) => {
       try {
         return await addMutation.mutateAsync(transactionData)
@@ -225,7 +225,7 @@ export const useTransactions = () => {
         amount: number
         account_id: string
         category_id?: string
-        counterparty_account_id?: string
+        counterparty_id?: string
       }
     ) => {
       try {

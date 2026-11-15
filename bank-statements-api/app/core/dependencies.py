@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.adapters.repositories.account import SQLAlchemyAccountRepository
 from app.adapters.repositories.background_job import SQLAlchemyBackgroundJobRepository
 from app.adapters.repositories.category import SQLAlchemyCategoryRepository
+from app.adapters.repositories.counterparty import SQLAlchemyCounterpartyRepository
 from app.adapters.repositories.enhancement_rule import SQLAlchemyEnhancementRuleRepository
 from app.adapters.repositories.filter_preset import SQLAlchemyFilterPresetRepository
 from app.adapters.repositories.initial_balance import SQLAlchemyInitialBalanceRepository
@@ -23,11 +24,13 @@ from app.ai.noop_llm import NoopLLMClient
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.account import AccountService
+from app.services.account_conversion import AccountConversionService
 from app.services.ai import LLMRuleCategorizer, LLMRuleCounterparty
 from app.services.ai.llm_category_generator import LLMCategoryGenerator
 from app.services.background.background_job_service import BackgroundJobService
 from app.services.category import CategoryService
 from app.services.chat import ChatService
+from app.services.counterparty import CounterpartyService
 from app.services.enhancement_rule_management import EnhancementRuleManagementService
 from app.services.initial_balance_service import InitialBalanceService
 from app.services.recurring_expense_analyzer import RecurringExpenseAnalyzer
@@ -111,6 +114,8 @@ class InternalDependencies:
         transaction_service: TransactionService,
         category_service: CategoryService,
         account_service: AccountService,
+        counterparty_service: CounterpartyService,
+        account_conversion_service: AccountConversionService,
         initial_balance_service: InitialBalanceService,
         statement_service: StatementService,
         statement_analyzer_service: StatementAnalyzerService,
@@ -124,6 +129,7 @@ class InternalDependencies:
         transaction_enhancer: TransactionEnhancer,
         category_repository: SQLAlchemyCategoryRepository,
         account_repository: SQLAlchemyAccountRepository,
+        counterparty_repository: SQLAlchemyCounterpartyRepository,
         recurring_expense_analyzer: RecurringExpenseAnalyzer,
         saved_filter_repository: SQLAlchemySavedFilterRepository,
         filter_preset_repository: SQLAlchemyFilterPresetRepository,
@@ -137,6 +143,8 @@ class InternalDependencies:
         self.transaction_service = transaction_service
         self.category_service = category_service
         self.account_service = account_service
+        self.counterparty_service = counterparty_service
+        self.account_conversion_service = account_conversion_service
         self.initial_balance_service = initial_balance_service
         self.statement_service = statement_service
         self.statement_analyzer_service = statement_analyzer_service
@@ -150,6 +158,7 @@ class InternalDependencies:
         self.transaction_enhancer = transaction_enhancer
         self.category_repository = category_repository
         self.account_repository = account_repository
+        self.counterparty_repository = counterparty_repository
         self.recurring_expense_analyzer = recurring_expense_analyzer
         self.saved_filter_repository = saved_filter_repository
         self.filter_preset_repository = filter_preset_repository
@@ -171,6 +180,7 @@ def build_internal_dependencies(
     transaction_repo = SQLAlchemyTransactionRepository(external.db)
     category_repo = SQLAlchemyCategoryRepository(external.db)
     account_repo = SQLAlchemyAccountRepository(external.db)
+    counterparty_repo = SQLAlchemyCounterpartyRepository(external.db)
     initial_balance_repo = SQLAlchemyInitialBalanceRepository(external.db)
     uploaded_file_repo = SQLAlchemyUploadedFileRepository(external.db)
     file_analysis_metadata_repo = SQLAlchemyFileAnalysisMetadataRepository(external.db)
@@ -191,6 +201,13 @@ def build_internal_dependencies(
     transaction_normalizer = TransactionNormalizer()
     category_service = CategoryService(category_repo)
     account_service = AccountService(account_repo)
+    counterparty_service = CounterpartyService(counterparty_repo)
+    account_conversion_service = AccountConversionService(
+        account_repository=account_repo,
+        counterparty_repository=counterparty_repo,
+        transaction_repository=transaction_repo,
+        enhancement_rule_repository=enhancement_rule_repo,
+    )
     initial_balance_service = InitialBalanceService(initial_balance_repo)
     statement_service = StatementService(statement_repo, transaction_repo)
     transaction_enhancer = TransactionEnhancer()
@@ -201,6 +218,8 @@ def build_internal_dependencies(
         enhancement_rule_repo,
         transaction_enhancer,
         category_repo,
+        counterparty_repo,
+        account_repo,
     )
 
     background_job_service = BackgroundJobService(background_job_repo)
@@ -214,6 +233,7 @@ def build_internal_dependencies(
         enhancement_rule_repository=enhancement_rule_repo,
         category_repository=category_repo,
         account_repository=account_repo,
+        counterparty_repository=counterparty_repo,
         transaction_repository=transaction_repo,
         transaction_service=transaction_service,
     )
@@ -251,7 +271,7 @@ def build_internal_dependencies(
         llm_client=external.llm_client,
     )
     llm_rule_counterparty = LLMRuleCounterparty(
-        account_repository=account_repo,
+        counterparty_repository=counterparty_repo,
         llm_client=external.llm_client,
     )
     llm_category_generator = LLMCategoryGenerator(
@@ -291,6 +311,8 @@ def build_internal_dependencies(
         transaction_service=transaction_service,
         category_service=category_service,
         account_service=account_service,
+        counterparty_service=counterparty_service,
+        account_conversion_service=account_conversion_service,
         initial_balance_service=initial_balance_service,
         statement_service=statement_service,
         statement_analyzer_service=statement_analyzer_service,
@@ -304,6 +326,7 @@ def build_internal_dependencies(
         transaction_enhancer=transaction_enhancer,
         category_repository=category_repo,
         account_repository=account_repo,
+        counterparty_repository=counterparty_repo,
         recurring_expense_analyzer=recurring_expense_analyzer,
         saved_filter_repository=saved_filter_repo,
         filter_preset_repository=filter_preset_repo,

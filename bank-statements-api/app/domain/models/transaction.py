@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, Date, DateTime
+from sqlalchemy import Boolean, CheckConstraint, Column, Date, DateTime
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy import ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
@@ -25,7 +25,7 @@ class SourceType(str, Enum):
     MANUAL = "manual"
 
 
-class CounterpartyStatus(str, Enum):
+class OtherSideStatus(str, Enum):
     UNPROCESSED = "UNPROCESSED"
     RULE_BASED = "RULE_BASED"
     MANUAL = "MANUAL"
@@ -77,15 +77,25 @@ class Transaction(Base):
         back_populates="transactions",
     )
 
-    counterparty_account_id = Column(
+    counterparty_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("counterparties.id"),
+        nullable=True,
+    )
+    counterparty = relationship(
+        "Counterparty",
+        back_populates="transactions",
+    )
+
+    transfer_account_id = Column(
         UUID(as_uuid=True),
         ForeignKey("accounts.id"),
         nullable=True,
     )
-    counterparty_account = relationship(
+    transfer_account = relationship(
         "Account",
-        foreign_keys=[counterparty_account_id],
-        back_populates="counterparty_transactions",
+        foreign_keys=[transfer_account_id],
+        back_populates="transfer_transactions",
     )
 
     tags = relationship(
@@ -103,9 +113,9 @@ class Transaction(Base):
 
     categorization_confidence = Column(Numeric(precision=5, scale=4), nullable=True)
 
-    counterparty_status = Column(
-        SQLAlchemyEnum(CounterpartyStatus),
-        default=CounterpartyStatus.UNPROCESSED,
+    other_side_status = Column(
+        SQLAlchemyEnum(OtherSideStatus, name="othersidestatus"),
+        default=OtherSideStatus.UNPROCESSED,
         nullable=False,
     )
 
@@ -139,6 +149,10 @@ class Transaction(Base):
         Index("ix_transactions_account_id_date", "account_id", "date"),
         Index("ix_transactions_user_id_category_id", "user_id", "category_id"),
         Index("ix_transactions_user_id_date", "user_id", "date"),
+        CheckConstraint(
+            "counterparty_id IS NULL OR transfer_account_id IS NULL",
+            name="ck_transactions_single_other_side",
+        ),
     )
 
     def __init__(self, *args, **kwargs):
@@ -180,13 +194,21 @@ class Transaction(Base):
         """Mark the transaction as manually categorized"""
         self.categorization_status = CategorizationStatus.MANUAL
 
-    def mark_rule_based_counterparty(self):
-        """Mark the counterparty as assigned by a rule"""
-        self.counterparty_status = CounterpartyStatus.RULE_BASED
+    def mark_rule_based_other_side(self):
+        """Mark the other side as assigned by a rule"""
+        self.other_side_status = OtherSideStatus.RULE_BASED
 
-    def mark_manual_counterparty(self):
-        """Mark the counterparty as manually assigned"""
-        self.counterparty_status = CounterpartyStatus.MANUAL
+    def mark_manual_other_side(self):
+        """Mark the other side as manually assigned"""
+        self.other_side_status = OtherSideStatus.MANUAL
+
+    def assign_counterparty(self, counterparty_id):
+        self.counterparty_id = counterparty_id
+        self.transfer_account_id = None
+
+    def assign_transfer_account(self, transfer_account_id):
+        self.transfer_account_id = transfer_account_id
+        self.counterparty_id = None
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, date={self.date}, amount={self.amount}, category_id={self.category_id}, sort_index={self.sort_index})>"

@@ -7,10 +7,11 @@ import pytest
 
 from app.adapters.repositories.account import SQLAlchemyAccountRepository
 from app.adapters.repositories.category import SQLAlchemyCategoryRepository
+from app.adapters.repositories.counterparty import SQLAlchemyCounterpartyRepository
 from app.adapters.repositories.enhancement_rule import SQLAlchemyEnhancementRuleRepository
 from app.adapters.repositories.transaction import SQLAlchemyTransactionRepository
 from app.domain.models.enhancement_rule import MatchType
-from app.domain.models.transaction import CategorizationStatus, CounterpartyStatus, SourceType, Transaction
+from app.domain.models.transaction import CategorizationStatus, OtherSideStatus, SourceType, Transaction
 from app.services.enhancement_rule_management import EnhancementRuleManagementService
 
 
@@ -20,6 +21,7 @@ def service(db_session):
         enhancement_rule_repository=SQLAlchemyEnhancementRuleRepository(db_session),
         category_repository=SQLAlchemyCategoryRepository(db_session),
         account_repository=SQLAlchemyAccountRepository(db_session),
+        counterparty_repository=SQLAlchemyCounterpartyRepository(db_session),
         transaction_repository=SQLAlchemyTransactionRepository(db_session),
         transaction_service=MagicMock(),
     )
@@ -37,7 +39,7 @@ def _make_transaction(db_session, account, index=0, **overrides):
         statement_id=None,
         source_type=SourceType.UPLOAD,
         categorization_status=CategorizationStatus.UNCATEGORIZED,
-        counterparty_status=CounterpartyStatus.UNPROCESSED,
+        other_side_status=OtherSideStatus.UNPROCESSED,
         row_index=index,
         sort_index=index,
         exclude_from_analytics=False,

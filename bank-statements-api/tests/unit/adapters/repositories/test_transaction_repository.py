@@ -30,7 +30,7 @@ class TestSQLAlchemyTransactionRepository:
             sort_index=0,
             source_type="UPLOAD",
             category_id=str(category_id),
-            counterparty_account_id=str(counterparty_id),
+            counterparty_id=str(counterparty_id),
             categorization_status=CategorizationStatus.RULE_BASED,
         )
 
@@ -51,7 +51,7 @@ class TestSQLAlchemyTransactionRepository:
         assert saved_transaction.account_id == account_id
         assert saved_transaction.statement_id == statement_id
         assert saved_transaction.category_id == category_id
-        assert saved_transaction.counterparty_account_id == counterparty_id
+        assert saved_transaction.counterparty_id == counterparty_id
         assert saved_transaction.categorization_status == CategorizationStatus.RULE_BASED
 
         session.commit.assert_called_once()
@@ -75,7 +75,7 @@ class TestSQLAlchemyTransactionRepository:
             sort_index=0,
             source_type="UPLOAD",
             category_id=None,
-            counterparty_account_id=None,
+            counterparty_id=None,
             categorization_status=None,
         )
 
@@ -90,7 +90,7 @@ class TestSQLAlchemyTransactionRepository:
         saved_transaction = session.add.call_args[0][0]
 
         assert saved_transaction.category_id is None
-        assert saved_transaction.counterparty_account_id is None
+        assert saved_transaction.counterparty_id is None
         assert saved_transaction.categorization_status == CategorizationStatus.UNCATEGORIZED
 
         session.commit.assert_called_once()

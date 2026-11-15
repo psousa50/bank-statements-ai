@@ -7,6 +7,10 @@ from starlette.responses import StreamingResponse
 
 from app.api.routes.auth import require_current_user
 from app.api.schemas import (
+    AccountConversionCandidateListResponse,
+    AccountConversionCandidateResponse,
+    AccountConversionRequest,
+    AccountConversionResponse,
     AccountCreate,
     AccountListResponse,
     AccountResponse,
@@ -19,6 +23,7 @@ from app.core.config import settings
 from app.core.dependencies import InternalDependencies
 from app.domain.models.user import User
 from app.logging.utils import log_exception
+from app.services.account_conversion import AccountIsRealAccount
 
 
 def _build_account_response(account, initial_balance) -> AccountResponse:
@@ -112,6 +117,42 @@ def register_account_routes(
             media_type="text/csv",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    @router.get(
+        "/conversion-candidates",
+        response_model=AccountConversionCandidateListResponse,
+    )
+    async def list_conversion_candidates(
+        internal: InternalDependencies = Depends(provide_dependencies),
+        current_user: User = Depends(require_current_user),
+    ):
+        candidates = internal.account_conversion_service.list_conversion_candidates(current_user.id)
+        return AccountConversionCandidateListResponse(
+            candidates=[AccountConversionCandidateResponse(**candidate) for candidate in candidates],
+            total=len(candidates),
+        )
+
+    @router.post(
+        "/{account_id}/convert-to-counterparty",
+        response_model=AccountConversionResponse,
+    )
+    async def convert_account_to_counterparty(
+        account_id: UUID,
+        request: AccountConversionRequest,
+        internal: InternalDependencies = Depends(provide_dependencies),
+        current_user: User = Depends(require_current_user),
+    ):
+        try:
+            result = internal.account_conversion_service.convert_to_counterparty(account_id, current_user.id, request.type)
+            return AccountConversionResponse(
+                counterparty=result.counterparty,
+                transactions_repointed=result.transactions_repointed,
+                rules_repointed=result.rules_repointed,
+            )
+        except AccountIsRealAccount as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
     @router.get("/{account_id}", response_model=AccountResponse)
     async def get_account(

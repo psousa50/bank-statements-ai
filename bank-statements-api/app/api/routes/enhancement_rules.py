@@ -51,9 +51,9 @@ def register_enhancement_rule_routes(
         ),
         description_search: Optional[str] = Query(None, description="Search in rule descriptions"),
         category_ids: Optional[List[UUID]] = Query(None, description="Filter by category IDs"),
-        counterparty_account_ids: Optional[List[UUID]] = Query(
+        counterparty_ids: Optional[List[UUID]] = Query(
             None,
-            description="Filter by counterparty account IDs",
+            description="Filter by counterparty IDs",
         ),
         match_type: Optional[MatchType] = Query(None, description="Filter by match type"),
         source: Optional[EnhancementRuleSource] = Query(None, description="Filter by rule source"),
@@ -77,7 +77,7 @@ def register_enhancement_rule_routes(
                 offset=offset,
                 description_search=description_search,
                 category_ids=category_ids,
-                counterparty_account_ids=counterparty_account_ids,
+                counterparty_ids=counterparty_ids,
                 match_type=match_type,
                 source=source,
                 rule_status_filter=rule_status_filter,
@@ -242,7 +242,8 @@ def register_enhancement_rule_routes(
                 user_id=current_user.id,
                 patterns=[pattern.model_dump() for pattern in rule_data.patterns],
                 category_id=rule_data.category_id,
-                counterparty_account_id=rule_data.counterparty_account_id,
+                counterparty_id=rule_data.counterparty_id,
+                transfer_account_id=rule_data.transfer_account_id,
                 min_amount=float(rule_data.min_amount) if rule_data.min_amount else None,
                 max_amount=float(rule_data.max_amount) if rule_data.max_amount else None,
                 start_date=rule_data.start_date,
@@ -279,7 +280,8 @@ def register_enhancement_rule_routes(
                 user_id=current_user.id,
                 patterns=[pattern.model_dump() for pattern in rule_data.patterns],
                 category_id=rule_data.category_id,
-                counterparty_account_id=rule_data.counterparty_account_id,
+                counterparty_id=rule_data.counterparty_id,
+                transfer_account_id=rule_data.transfer_account_id,
                 min_amount=float(rule_data.min_amount) if rule_data.min_amount else None,
                 max_amount=float(rule_data.max_amount) if rule_data.max_amount else None,
                 start_date=rule_data.start_date,
@@ -533,7 +535,8 @@ def register_enhancement_rule_routes(
                 rule.ai_processed_at = datetime.now(timezone.utc)
 
                 if request.auto_apply and suggestion.confidence >= request.confidence_threshold:
-                    rule.counterparty_account_id = suggestion.suggested_counterparty_id
+                    rule.counterparty_id = suggestion.suggested_counterparty_id
+                    rule.transfer_account_id = None
                     auto_applied += 1
                 else:
                     suggestion_count += 1
@@ -587,7 +590,8 @@ def register_enhancement_rule_routes(
                 rule.ai_category_confidence = None
 
             if has_counterparty_suggestion:
-                rule.counterparty_account_id = rule.ai_suggested_counterparty_id
+                rule.counterparty_id = rule.ai_suggested_counterparty_id
+                rule.transfer_account_id = None
                 rule.ai_counterparty_confidence = None
 
             internal.enhancement_rule_repository.save(rule)

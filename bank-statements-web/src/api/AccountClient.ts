@@ -1,5 +1,6 @@
 import { axiosInstance } from './ApiClient'
 import { Account } from '../types/Transaction'
+import { AccountConversionCandidate, AccountConversionResult, CounterpartyType } from '../types/Counterparty'
 
 // Re-export Account type for convenience
 export type { Account }
@@ -26,6 +27,8 @@ export interface AccountClient {
   deleteInitialBalance: (id: string) => Promise<void>
   exportAccounts: () => Promise<void>
   uploadAccounts: (file: File) => Promise<AccountUploadResponse>
+  getConversionCandidates: () => Promise<AccountConversionCandidate[]>
+  convertToCounterparty: (id: string, type: CounterpartyType) => Promise<AccountConversionResult>
 }
 
 // Use the VITE_API_URL environment variable for the base URL, or default to '' for local development
@@ -84,6 +87,20 @@ export const accountClient: AccountClient = {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
+  },
+
+  getConversionCandidates: async (): Promise<AccountConversionCandidate[]> => {
+    const response = await axiosInstance.get<{ candidates: AccountConversionCandidate[]; total: number }>(
+      `${API_URL}/conversion-candidates`
+    )
+    return response.data.candidates
+  },
+
+  convertToCounterparty: async (id: string, type: CounterpartyType): Promise<AccountConversionResult> => {
+    const response = await axiosInstance.post<AccountConversionResult>(`${API_URL}/${id}/convert-to-counterparty`, {
+      type,
+    })
+    return response.data
   },
 
   uploadAccounts: async (file: File): Promise<AccountUploadResponse> => {

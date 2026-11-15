@@ -91,9 +91,10 @@ class TransactionRuleEnhancementService:
             dto = transaction_dtos[i]
             dto.category_id = transaction.category_id
             dto.categorization_status = transaction.categorization_status
-            dto.counterparty_account_id = transaction.counterparty_account_id
+            dto.counterparty_id = transaction.counterparty_id
+            dto.transfer_account_id = transaction.transfer_account_id
 
-            if transaction.category_id or transaction.counterparty_account_id:
+            if transaction.category_id or transaction.counterparty_id or transaction.transfer_account_id:
                 matched_count += 1
             else:
                 unmatched_transactions.append(transaction)
@@ -158,7 +159,8 @@ class TransactionRuleEnhancementService:
                 id=uuid4(),
                 user_id=user_id,
                 category_id=None,
-                counterparty_account_id=None,
+                counterparty_id=None,
+                transfer_account_id=None,
                 source=EnhancementRuleSource.AUTO,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc),
@@ -197,9 +199,12 @@ class TransactionRuleEnhancementService:
                     transaction.category_id = rule.category_id
                     transaction.mark_rule_based_categorization()
 
-                if rule.counterparty_account_id is not None:
-                    transaction.counterparty_account_id = rule.counterparty_account_id
-                    transaction.mark_rule_based_counterparty()
+                if rule.counterparty_id is not None:
+                    transaction.assign_counterparty(rule.counterparty_id)
+                    transaction.mark_rule_based_other_side()
+                elif rule.transfer_account_id is not None:
+                    transaction.assign_transfer_account(rule.transfer_account_id)
+                    transaction.mark_rule_based_other_side()
 
         return transactions
 

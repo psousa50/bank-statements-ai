@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from uuid import uuid4
 
-from sqlalchemy import Column, Date, DateTime
+from sqlalchemy import CheckConstraint, Column, Date, DateTime
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy import ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
@@ -45,7 +45,12 @@ class EnhancementRule(Base):
         ForeignKey("categories.id"),
         nullable=True,
     )
-    counterparty_account_id = Column(
+    counterparty_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("counterparties.id"),
+        nullable=True,
+    )
+    transfer_account_id = Column(
         UUID(as_uuid=True),
         ForeignKey("accounts.id"),
         nullable=True,
@@ -60,7 +65,7 @@ class EnhancementRule(Base):
     ai_category_confidence = Column(Numeric(precision=5, scale=4), nullable=True)
     ai_suggested_counterparty_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("accounts.id"),
+        ForeignKey("counterparties.id"),
         nullable=True,
     )
     ai_counterparty_confidence = Column(Numeric(precision=5, scale=4), nullable=True)
@@ -95,9 +100,10 @@ class EnhancementRule(Base):
         lazy="selectin",
     )
     category = relationship("Category", foreign_keys=[category_id])
-    counterparty_account = relationship("Account", foreign_keys=[counterparty_account_id])
+    counterparty = relationship("Counterparty", foreign_keys=[counterparty_id])
+    transfer_account = relationship("Account", foreign_keys=[transfer_account_id])
     ai_suggested_category = relationship("Category", foreign_keys=[ai_suggested_category_id])
-    ai_suggested_counterparty = relationship("Account", foreign_keys=[ai_suggested_counterparty_id])
+    ai_suggested_counterparty = relationship("Counterparty", foreign_keys=[ai_suggested_counterparty_id])
     split_lines = relationship(
         "EnhancementRuleSplitLine",
         back_populates="rule",
@@ -106,21 +112,32 @@ class EnhancementRule(Base):
         lazy="selectin",
     )
 
+    __table_args__ = (
+        CheckConstraint(
+            "counterparty_id IS NULL OR transfer_account_id IS NULL",
+            name="ck_enhancement_rules_single_other_side",
+        ),
+    )
+
     @property
     def has_split_template(self) -> bool:
         return bool(self.split_lines)
 
     @property
+    def has_other_side(self) -> bool:
+        return self.counterparty_id is not None or self.transfer_account_id is not None
+
+    @property
     def rule_type(self) -> str:
         has_category = self.category_id is not None
-        has_counterparty = self.counterparty_account_id is not None
+        other_side = "Counterparty" if self.counterparty_id is not None else ("Transfer" if self.transfer_account_id else None)
 
-        if has_category and has_counterparty:
-            return "Category + Counterparty"
+        if has_category and other_side:
+            return f"Category + {other_side}"
         elif has_category:
             return "Category Only"
-        elif has_counterparty:
-            return "Counterparty Only"
+        elif other_side:
+            return f"{other_side} Only"
         else:
             return "Unconfigured"
 
@@ -167,5 +184,6 @@ class EnhancementRule(Base):
             f"<EnhancementRule(id={self.id}, "
             f"patterns=[{pattern_repr}], "
             f"category_id={self.category_id}, "
-            f"counterparty_account_id={self.counterparty_account_id})>"
+            f"counterparty_id={self.counterparty_id}, "
+            f"transfer_account_id={self.transfer_account_id})>"
         )

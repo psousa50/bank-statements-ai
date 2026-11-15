@@ -9,7 +9,9 @@ from app.domain.dto.statement_processing import TransactionDTO
 from app.domain.models.category import CategoryKind, CategoryPriority
 from app.domain.models.enhancement_rule import EnhancementRule, EnhancementRuleSource, MatchType
 from app.domain.models.transaction import CategorizationStatus, SourceType, Transaction
+from app.ports.repositories.account import AccountRepository
 from app.ports.repositories.category import CategoryRepository
+from app.ports.repositories.counterparty import CounterpartyRepository
 from app.ports.repositories.enhancement_rule import EnhancementRuleRepository
 from app.ports.repositories.initial_balance import InitialBalanceRepository
 from app.ports.repositories.transaction import TransactionRepository
@@ -42,12 +44,16 @@ class TransactionService:
         enhancement_rule_repository: EnhancementRuleRepository,
         transaction_enhancer: TransactionEnhancer,
         category_repository: Optional[CategoryRepository] = None,
+        counterparty_repository: Optional[CounterpartyRepository] = None,
+        account_repository: Optional[AccountRepository] = None,
     ):
         self.transaction_repository = transaction_repository
         self.initial_balance_repository = initial_balance_repository
         self.enhancement_rule_repository = enhancement_rule_repository
         self.transaction_enhancer = transaction_enhancer
         self.category_repository = category_repository
+        self.counterparty_repository = counterparty_repository
+        self.account_repository = account_repository
 
     def _expand_category_ids(self, category_ids: Optional[List[UUID]], user_id: UUID) -> Optional[List[UUID]]:
         if not category_ids or not self.category_repository:
@@ -60,6 +66,23 @@ class TransactionService:
         if self.category_repository.get_subcategories(category_id, user_id):
             raise ValueError("Cannot assign a transaction to a category that has subcategories; choose a subcategory instead.")
 
+    def _ensure_other_side_belongs_to_user(
+        self,
+        counterparty_id: Optional[UUID],
+        transfer_account_id: Optional[UUID],
+        user_id: UUID,
+    ) -> None:
+        if counterparty_id and transfer_account_id:
+            raise ValueError("A transaction cannot have both a counterparty and a transfer account")
+
+        if counterparty_id and self.counterparty_repository:
+            if not self.counterparty_repository.get_by_id(counterparty_id, user_id):
+                raise ValueError(f"Counterparty with ID {counterparty_id} not found")
+
+        if transfer_account_id and self.account_repository:
+            if not self.account_repository.get_by_id(transfer_account_id, user_id):
+                raise ValueError(f"Account with ID {transfer_account_id} not found")
+
     def create_transaction(
         self,
         user_id: UUID,
@@ -67,6 +90,7 @@ class TransactionService:
         after_transaction_id: Optional[UUID] = None,
     ) -> Transaction:
         self._ensure_leaf_category(transaction_data.category_id, user_id)
+        self._ensure_other_side_belongs_to_user(transaction_data.counterparty_id, transaction_data.transfer_account_id, user_id)
         enhanced_data = transaction_data
 
         if transaction_data.category_id is None:
@@ -100,7 +124,8 @@ class TransactionService:
                         amount=transaction_data.amount,
                         account_id=transaction_data.account_id,
                         category_id=matching_rule.category_id,
-                        counterparty_account_id=matching_rule.counterparty_account_id,
+                        counterparty_id=matching_rule.counterparty_id,
+                        transfer_account_id=matching_rule.transfer_account_id,
                         after_transaction_id=transaction_data.after_transaction_id,
                     )
                 else:
@@ -126,7 +151,8 @@ class TransactionService:
             id=uuid4(),
             user_id=user_id,
             category_id=None,
-            counterparty_account_id=None,
+            counterparty_id=None,
+            transfer_account_id=None,
             source=EnhancementRuleSource.AUTO,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
@@ -424,9 +450,11 @@ class TransactionService:
         amount: Decimal,
         account_id: UUID,
         category_id: Optional[UUID] = None,
-        counterparty_account_id: Optional[UUID] = None,
+        counterparty_id: Optional[UUID] = None,
+        transfer_account_id: Optional[UUID] = None,
     ) -> Optional[Transaction]:
         self._ensure_leaf_category(category_id, user_id)
+        self._ensure_other_side_belongs_to_user(counterparty_id, transfer_account_id, user_id)
         transaction = self.transaction_repository.get_by_id(transaction_id, user_id)
         if transaction:
             transaction.date = transaction_date
@@ -438,7 +466,10 @@ class TransactionService:
                 CategorizationStatus.MANUAL if category_id else CategorizationStatus.UNCATEGORIZED
             )
             transaction.account_id = account_id  # type: ignore
-            transaction.counterparty_account_id = counterparty_account_id  # type: ignore
+            if transfer_account_id is not None:
+                transaction.assign_transfer_account(transfer_account_id)
+            else:
+                transaction.assign_counterparty(counterparty_id)
             return self.transaction_repository.update(transaction)
         return None
 
@@ -860,11 +891,18 @@ class TransactionService:
                 category_uuid = UUID(dto.category_id)
 
         counterparty_uuid = None
-        if dto.counterparty_account_id:
-            if isinstance(dto.counterparty_account_id, UUID):
-                counterparty_uuid = dto.counterparty_account_id
+        if dto.counterparty_id:
+            if isinstance(dto.counterparty_id, UUID):
+                counterparty_uuid = dto.counterparty_id
             else:
-                counterparty_uuid = UUID(dto.counterparty_account_id)
+                counterparty_uuid = UUID(dto.counterparty_id)
+
+        transfer_account_uuid = None
+        if dto.transfer_account_id:
+            if isinstance(dto.transfer_account_id, UUID):
+                transfer_account_uuid = dto.transfer_account_id
+            else:
+                transfer_account_uuid = UUID(dto.transfer_account_id)
 
         categorization_status = dto.categorization_status or CategorizationStatus.UNCATEGORIZED
 
@@ -881,7 +919,8 @@ class TransactionService:
             source_type=source_type_enum,
             manual_position_after=dto.manual_position_after,
             category_id=category_uuid,
-            counterparty_account_id=counterparty_uuid,
+            counterparty_id=counterparty_uuid,
+            transfer_account_id=transfer_account_uuid,
             categorization_status=categorization_status,
             account_id=account_uuid,
         )

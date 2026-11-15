@@ -4,8 +4,8 @@ from typing import List
 
 import pandas as pd
 
-from app.domain.models.account import Account
 from app.domain.models.category import Category
+from app.domain.models.counterparty import Counterparty
 from app.domain.models.transaction import Transaction
 
 
@@ -171,86 +171,37 @@ Only return the JSON object, nothing else.
 
 def rule_counterparty_prompt(
     rule_patterns: list[str],
-    accounts: List[Account],
+    counterparties: List[Counterparty],
 ) -> str:
-    accounts_info = [f"{{id: {account.id}, name: {account.name}}}" for account in accounts]
+    counterparties_info = [f"{{id: {c.id}, name: {c.name}, type: {c.type}}}" for c in counterparties]
 
     patterns_text = "\n".join(rule_patterns)
 
     prompt = f"""
-You are a bank transaction counterparty identification assistant. Your task is to identify the most likely counterparty account for each transaction description pattern from the provided list.
+You are a bank transaction counterparty identification assistant. Your task is to identify the most likely counterparty for each transaction description pattern from the provided list.
+
+A counterparty is the person, company or merchant on the other side of a transaction. It is never one of the user's own bank accounts.
 
 These are normalized transaction description patterns (not individual transactions). Each pattern represents a merchant or type of transaction that appears regularly.
 
 Patterns:
 {patterns_text}
 
-Available Counterparty Accounts:
-{json.dumps(accounts_info, indent=2)}
+Available Counterparties:
+{json.dumps(counterparties_info, indent=2)}
 
-For each pattern, analyze the description to determine which counterparty account is most likely involved in transactions matching this pattern.
+For each pattern, analyze the description to determine which counterparty is most likely involved in transactions matching this pattern.
 
 Consider:
-- Transaction descriptions that might indicate transfers between accounts
-- Account names that might match or relate to the transaction description
-- Common patterns in inter-account transfers (e.g., "TRANSFER FROM SAVINGS" likely relates to a Savings account)
+- Counterparty names that match or relate to the transaction description
+- Abbreviated or truncated merchant names that banks commonly produce
+- Return null when the description does not clearly identify any of the available counterparties
 
 Return your answer as a JSON object with the following format:
 [
     {{
         "pattern": <the exact pattern from the input>,
-        "counterparty_account_id": <id of the identified counterparty account, or null if no clear counterparty>,
-        "confidence": <a number between 0 and 1 indicating your confidence in this identification>
-    }}
-]
-
-Only return the JSON object, nothing else.
-"""
-    return prompt
-
-
-def counterparty_identification_prompt(transactions: List[Transaction], accounts: List[Account]) -> str:
-    """Create a prompt for LLM to identify counterparty accounts for transactions"""
-
-    accounts_info = [f"{{id: {account.id}, name: {account.name}}}" for account in accounts]
-
-    transaction_data = []
-    for t in transactions:
-        transaction_data.append(
-            {
-                "description": t.description,
-                "amount": str(t.amount),
-            }
-        )
-
-    prompt = f"""
-You are a bank transaction counterparty identification assistant. Your task is to identify the most likely counterparty account for each transaction based on the transaction description and amount.
-
-Transactions: 
-{json.dumps(transaction_data, indent=2)}
-
-Available Counterparty Accounts:
-{json.dumps(accounts_info, indent=2)}
-
-For each transaction, analyze the description and amount to determine which counterparty account is most likely involved in this transaction.
-
-Consider:
-- Transaction descriptions that might indicate transfers between accounts
-- Positive amounts typically indicate money coming FROM the counterparty account TO the current account
-- Negative amounts typically indicate money going FROM the current account TO the counterparty account
-- Account names that might match or relate to the transaction description
-- Common patterns in inter-account transfers
-
-Return your answer as a JSON object with the following format:
-[
-    {{
-        "transaction_description": <description of the transaction>,
-        "counterparty_account_id": <id of the identified counterparty account, or null if no clear counterparty>,
-        "confidence": <a number between 0 and 1 indicating your confidence in this identification>
-    }},
-    {{
-        "transaction_description": <description of the transaction>,
-        "counterparty_account_id": <id of the identified counterparty account, or null if no clear counterparty>,
+        "counterparty_id": <id of the identified counterparty, or null if no clear counterparty>,
         "confidence": <a number between 0 and 1 indicating your confidence in this identification>
     }}
 ]

@@ -16,6 +16,7 @@ import {
   Button,
 } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
 import DeleteIcon from '@mui/icons-material/Delete'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
@@ -24,6 +25,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { EnhancementRule, EnhancementRuleFilters, EnhancementRuleSource, MatchType } from '../types/EnhancementRule'
+import { COUNTERPARTY_TYPE_LABELS } from '../types/Counterparty'
 
 interface EnhancementRuleTableProps {
   rules: EnhancementRule[]
@@ -56,7 +58,7 @@ export const EnhancementRuleTable: React.FC<EnhancementRuleTableProps> = ({
   }
 
   const handleViewTransactions = (rule: EnhancementRule) => {
-    const isUnconfigured = !rule.category_id && !rule.counterparty_account_id
+    const isUnconfigured = !rule.category_id && !rule.counterparty_id
     const params = new URLSearchParams({
       enhancement_rule_id: rule.id,
     })
@@ -279,20 +281,30 @@ export const EnhancementRuleTable: React.FC<EnhancementRuleTableProps> = ({
                 )}
               </TableCell>
               <TableCell>
-                {rule.counterparty_account ? (
+                {rule.counterparty ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {rule.ai_suggested_counterparty_id === rule.counterparty_account_id && (
+                    {rule.ai_suggested_counterparty_id === rule.counterparty_id && (
                       <Tooltip title="Set by AI">
                         <AutoAwesomeIcon sx={{ fontSize: 14, color: 'info.main' }} />
                       </Tooltip>
                     )}
                     <Box>
-                      <Typography variant="body2">{rule.counterparty_account.name}</Typography>
-                      {rule.counterparty_account.account_number && (
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          {rule.counterparty_account.account_number}
-                        </Typography>
-                      )}
+                      <Typography variant="body2">{rule.counterparty.name}</Typography>
+                      <Typography variant="caption" display="block" color="text.secondary">
+                        {COUNTERPARTY_TYPE_LABELS[rule.counterparty.type]}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ) : rule.transfer_account ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Tooltip title="Transfer between your own accounts">
+                      <SwapHorizIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                    </Tooltip>
+                    <Box>
+                      <Typography variant="body2">{rule.transfer_account.name}</Typography>
+                      <Typography variant="caption" display="block" color="text.secondary">
+                        Transfer
+                      </Typography>
                     </Box>
                   </Box>
                 ) : rule.ai_suggested_counterparty ? (
@@ -466,7 +478,7 @@ export const EnhancementRuleTable: React.FC<EnhancementRuleTableProps> = ({
                       onClick={() => onApply(rule)}
                       disabled={
                         loading ||
-                        !(rule.category_id || rule.counterparty_account_id) ||
+                        !(rule.category_id || rule.counterparty_id) ||
                         (rule.pending_transaction_count ?? 0) === 0
                       }
                       title="Apply rule to existing transactions"

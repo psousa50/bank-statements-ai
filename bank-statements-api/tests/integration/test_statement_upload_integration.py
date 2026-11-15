@@ -585,7 +585,7 @@ class TestStatementUploadIntegration:
                 assert rule.patterns
                 assert all(p.normalized_description for p in rule.patterns)
                 assert rule.created_at is not None
-                # Note: category_id and counterparty_account_id can be None for unmatched rules
+                # Note: category_id and counterparty_id can be None for unmatched rules
 
     def test_upload_with_row_filters_integration(self, db_session, llm_client, test_user):
         """Test complete upload flow with row filters persisted to file analysis metadata."""

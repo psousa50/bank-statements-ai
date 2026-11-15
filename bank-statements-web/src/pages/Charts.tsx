@@ -9,6 +9,7 @@ import {
 } from '../services/hooks/useTransactions'
 import { useCategories } from '../services/hooks/useCategories'
 import { useAccounts } from '../services/hooks/useAccounts'
+import { useCounterparties } from '../services/hooks/useCounterparties'
 import { TransactionFilters, CategorizationFilter } from '../components/TransactionFilters'
 import { CategoryTimeSeriesChart } from '../components/CategoryTimeSeriesChart'
 import { IncomeSpendingChart } from '../components/IncomeSpendingChart'
@@ -152,6 +153,7 @@ export const ChartsPage = () => {
 
   const { categories, loading: categoriesLoading, error: categoriesError } = useCategories()
   const { accounts, loading: accountsLoading, error: accountsError } = useAccounts()
+  const { counterparties, loading: counterpartiesLoading } = useCounterparties()
 
   const displayCurrency = useMemo(() => {
     if (!filters.account_id) return 'EUR'
@@ -573,19 +575,19 @@ export const ChartsPage = () => {
 
   const counterpartyChartData = useMemo(() => {
     if (!counterpartyTotals) return []
-    const accountName = new Map((accounts || []).map((a) => [a.id, a.name]))
+    const counterpartyName = new Map((counterparties || []).map((c) => [c.id, c.name]))
     return counterpartyTotals.totals
-      .filter((t) => t.counterparty_account_id)
+      .filter((t) => t.counterparty_id)
       .filter((t) => keepByDirection(t.total_amount, direction))
       .map((t) => ({
-        id: t.counterparty_account_id!,
-        name: accountName.get(t.counterparty_account_id!) || 'Unknown',
+        id: t.counterparty_id!,
+        name: counterpartyName.get(t.counterparty_id!) || 'Unknown',
         value: toMagnitude(t.total_amount, direction),
         count: t.transaction_count,
-        color: counterpartyColor(t.counterparty_account_id!),
+        color: counterpartyColor(t.counterparty_id!),
       }))
       .sort((a, b) => b.value - a.value)
-  }, [counterpartyTotals, accounts, direction])
+  }, [counterpartyTotals, counterparties, direction])
 
   const hiddenChartEntries = useMemo(() => {
     if (!categories) return chartData.filter((d) => hiddenChartCategoryIds.has(d.id))
@@ -793,7 +795,7 @@ export const ChartsPage = () => {
   const isBreakdown = viewMode === 'bar' || viewMode === 'pie'
   const pieData = isCounterparty ? counterpartyChartData : chartData
   const barData = isCounterparty ? counterpartyChartData : visibleChartData
-  const activeLoading = isCounterparty ? counterpartyTotalsLoading || accountsLoading : loading
+  const activeLoading = isCounterparty ? counterpartyTotalsLoading || counterpartiesLoading : loading
   const activeNoDataMessage = useMemo(() => {
     if (!isCounterparty) return noDataMessage
     if (!counterpartyTotals) return { title: 'Loading...', description: 'Fetching transaction data.' }

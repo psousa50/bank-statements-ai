@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from app.domain.models.account import Account
@@ -28,4 +28,8 @@ class AccountRepository(ABC):
 
     @abstractmethod
     def delete(self, account_id: UUID, user_id: UUID) -> None:
+        pass
+
+    @abstractmethod
+    def count_ownership_records(self, account_id: UUID) -> Dict[str, int]:
         pass

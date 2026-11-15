@@ -8,6 +8,7 @@ from app.domain.models.enhancement_rule_pattern import EnhancementRulePattern
 from app.domain.models.enhancement_rule_split_line import EnhancementRuleSplitLine
 from app.ports.repositories.account import AccountRepository
 from app.ports.repositories.category import CategoryRepository
+from app.ports.repositories.counterparty import CounterpartyRepository
 from app.ports.repositories.enhancement_rule import EnhancementRuleRepository
 from app.ports.repositories.transaction import TransactionRepository
 from app.services.transaction import TransactionService
@@ -19,12 +20,14 @@ class EnhancementRuleManagementService:
         enhancement_rule_repository: EnhancementRuleRepository,
         category_repository: CategoryRepository,
         account_repository: AccountRepository,
+        counterparty_repository: CounterpartyRepository,
         transaction_repository: TransactionRepository,
         transaction_service: TransactionService,
     ):
         self.enhancement_rule_repository = enhancement_rule_repository
         self.category_repository = category_repository
         self.account_repository = account_repository
+        self.counterparty_repository = counterparty_repository
         self.transaction_repository = transaction_repository
         self.transaction_service = transaction_service
 
@@ -35,7 +38,7 @@ class EnhancementRuleManagementService:
         offset: int = 0,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -50,7 +53,7 @@ class EnhancementRuleManagementService:
             offset=offset,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
@@ -64,7 +67,7 @@ class EnhancementRuleManagementService:
             user_id=user_id,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
@@ -91,7 +94,8 @@ class EnhancementRuleManagementService:
         user_id: UUID,
         patterns: List[Dict[str, Any]],
         category_id: Optional[UUID] = None,
-        counterparty_account_id: Optional[UUID] = None,
+        counterparty_id: Optional[UUID] = None,
+        transfer_account_id: Optional[UUID] = None,
         min_amount: Optional[float] = None,
         max_amount: Optional[float] = None,
         start_date: Optional[str] = None,
@@ -104,10 +108,7 @@ class EnhancementRuleManagementService:
             if not category:
                 raise ValueError(f"Category with ID {category_id} not found")
 
-        if counterparty_account_id:
-            account = self.account_repository.get_by_id(counterparty_account_id, user_id)
-            if not account:
-                raise ValueError(f"Account with ID {counterparty_account_id} not found")
+        self._validate_other_side(counterparty_id, transfer_account_id, user_id)
 
         if min_amount is not None and max_amount is not None and min_amount > max_amount:
             raise ValueError("min_amount cannot be greater than max_amount")
@@ -115,7 +116,8 @@ class EnhancementRuleManagementService:
         rule = EnhancementRule(
             user_id=user_id,
             category_id=category_id,
-            counterparty_account_id=counterparty_account_id,
+            counterparty_id=counterparty_id,
+            transfer_account_id=transfer_account_id,
             min_amount=min_amount,
             max_amount=max_amount,
             start_date=start_date,
@@ -136,7 +138,8 @@ class EnhancementRuleManagementService:
         user_id: UUID,
         patterns: List[Dict[str, Any]],
         category_id: Optional[UUID] = None,
-        counterparty_account_id: Optional[UUID] = None,
+        counterparty_id: Optional[UUID] = None,
+        transfer_account_id: Optional[UUID] = None,
         min_amount: Optional[float] = None,
         max_amount: Optional[float] = None,
         start_date: Optional[str] = None,
@@ -154,17 +157,15 @@ class EnhancementRuleManagementService:
             if not category:
                 raise ValueError(f"Category with ID {category_id} not found")
 
-        if counterparty_account_id:
-            account = self.account_repository.get_by_id(counterparty_account_id, user_id)
-            if not account:
-                raise ValueError(f"Account with ID {counterparty_account_id} not found")
+        self._validate_other_side(counterparty_id, transfer_account_id, user_id)
 
         if min_amount is not None and max_amount is not None and min_amount > max_amount:
             raise ValueError("min_amount cannot be greater than max_amount")
 
         self._reconcile_patterns(rule, patterns)
         rule.category_id = category_id
-        rule.counterparty_account_id = counterparty_account_id
+        rule.counterparty_id = counterparty_id
+        rule.transfer_account_id = transfer_account_id
         rule.min_amount = min_amount
         rule.max_amount = max_amount
         rule.start_date = start_date
@@ -178,7 +179,7 @@ class EnhancementRuleManagementService:
             rule.ai_suggested_category_id = None
             rule.ai_category_confidence = None
 
-        if counterparty_account_id is not None:
+        if counterparty_id is not None:
             rule.ai_suggested_counterparty_id = None
             rule.ai_counterparty_confidence = None
 
@@ -249,9 +250,9 @@ class EnhancementRuleManagementService:
         manual_rules = len([r for r in all_rules if r.source == EnhancementRuleSource.MANUAL])
         auto_rules = len([r for r in all_rules if r.source == EnhancementRuleSource.AUTO])
 
-        category_only_rules = len([r for r in all_rules if r.category_id and not r.counterparty_account_id])
-        counterparty_only_rules = len([r for r in all_rules if r.counterparty_account_id and not r.category_id])
-        combined_rules = len([r for r in all_rules if r.category_id and r.counterparty_account_id])
+        category_only_rules = len([r for r in all_rules if r.category_id and not r.has_other_side])
+        counterparty_only_rules = len([r for r in all_rules if r.has_other_side and not r.category_id])
+        combined_rules = len([r for r in all_rules if r.category_id and r.has_other_side])
 
         counts = self.transaction_repository.count_matching_rules_batch(all_rules, uncategorized_only=False)
 
@@ -290,7 +291,7 @@ class EnhancementRuleManagementService:
                     "rule_id": str(rule.id),
                     "normalized_description": _first_pattern_text(rule),
                     "category_name": rule.category.name if rule.category else None,
-                    "counterparty_name": rule.counterparty_account.name if rule.counterparty_account else None,
+                    "counterparty_name": rule.counterparty.name if rule.counterparty else None,
                     "transaction_count": count,
                     "source": rule.source.value,
                     "rule_type": rule.rule_type,
@@ -302,7 +303,7 @@ class EnhancementRuleManagementService:
                     "rule_id": str(rule.id),
                     "normalized_description": _first_pattern_text(rule),
                     "category_name": rule.category.name if rule.category else None,
-                    "counterparty_name": rule.counterparty_account.name if rule.counterparty_account else None,
+                    "counterparty_name": rule.counterparty.name if rule.counterparty else None,
                     "source": rule.source.value,
                     "created_at": rule.created_at.isoformat(),
                     "rule_type": rule.rule_type,
@@ -310,6 +311,21 @@ class EnhancementRuleManagementService:
                 for rule in unused_rules
             ],
         }
+
+    def _validate_other_side(
+        self,
+        counterparty_id: Optional[UUID],
+        transfer_account_id: Optional[UUID],
+        user_id: UUID,
+    ) -> None:
+        if counterparty_id and transfer_account_id:
+            raise ValueError("A rule cannot set both a counterparty and a transfer account")
+
+        if counterparty_id and not self.counterparty_repository.get_by_id(counterparty_id, user_id):
+            raise ValueError(f"Counterparty with ID {counterparty_id} not found")
+
+        if transfer_account_id and not self.account_repository.get_by_id(transfer_account_id, user_id):
+            raise ValueError(f"Account with ID {transfer_account_id} not found")
 
     def _build_patterns(self, patterns: List[Dict[str, Any]]) -> List[EnhancementRulePattern]:
         if not patterns:
@@ -392,7 +408,7 @@ class EnhancementRuleManagementService:
 
     def _get_rule_transaction_count(self, rule: EnhancementRule) -> int:
         try:
-            is_unconfigured = not rule.category_id and not rule.counterparty_account_id
+            is_unconfigured = not rule.category_id and not rule.has_other_side
             return self.transaction_repository.count_matching_rule(rule, uncategorized_only=is_unconfigured)
         except Exception:
             return 0
@@ -417,8 +433,8 @@ class EnhancementRuleManagementService:
 
         counts = {}
         if rules_needing_counts:
-            unconfigured_rules = [r for r in rules_needing_counts if not r.category_id and not r.counterparty_account_id]
-            configured_rules = [r for r in rules_needing_counts if r.category_id or r.counterparty_account_id]
+            unconfigured_rules = [r for r in rules_needing_counts if not r.category_id and not r.has_other_side]
+            configured_rules = [r for r in rules_needing_counts if r.category_id or r.has_other_side]
 
             if unconfigured_rules:
                 counts.update(
@@ -461,15 +477,13 @@ class EnhancementRuleManagementService:
             if not category:
                 raise ValueError(f"Category with ID {rule_preview.category_id} not found")
 
-        if rule_preview.counterparty_account_id:
-            account = self.account_repository.get_by_id(rule_preview.counterparty_account_id, user_id)
-            if not account:
-                raise ValueError(f"Account with ID {rule_preview.counterparty_account_id} not found")
+        self._validate_other_side(rule_preview.counterparty_id, rule_preview.transfer_account_id, user_id)
 
         temp_rule = EnhancementRule(
             user_id=user_id,
             category_id=rule_preview.category_id,
-            counterparty_account_id=rule_preview.counterparty_account_id,
+            counterparty_id=rule_preview.counterparty_id,
+            transfer_account_id=rule_preview.transfer_account_id,
             min_amount=rule_preview.min_amount,
             max_amount=rule_preview.max_amount,
             start_date=rule_preview.start_date,
@@ -486,7 +500,7 @@ class EnhancementRuleManagementService:
         }
 
     def apply_rule_to_existing_transactions(self, rule_id: UUID, user_id: UUID) -> int:
-        from app.domain.models.transaction import CategorizationStatus, CounterpartyStatus, Transaction
+        from app.domain.models.transaction import CategorizationStatus, OtherSideStatus, Transaction
 
         rule = self.enhancement_rule_repository.find_by_id(rule_id, user_id)
         if not rule:
@@ -533,22 +547,23 @@ class EnhancementRuleManagementService:
                     transaction.categorization_status = CategorizationStatus.RULE_BASED
                     updated = True
 
-                if (
-                    rule.counterparty_account_id
-                    and transaction.counterparty_status
-                    in [
-                        CounterpartyStatus.UNPROCESSED,
-                        CounterpartyStatus.RULE_BASED,
-                        CounterpartyStatus.FAILURE,
-                    ]
-                    and (
-                        transaction.counterparty_account_id != rule.counterparty_account_id
-                        or transaction.counterparty_status != CounterpartyStatus.RULE_BASED
+                if rule.has_other_side and transaction.other_side_status in [
+                    OtherSideStatus.UNPROCESSED,
+                    OtherSideStatus.RULE_BASED,
+                    OtherSideStatus.FAILURE,
+                ]:
+                    other_side_changed = (
+                        transaction.counterparty_id != rule.counterparty_id
+                        or transaction.transfer_account_id != rule.transfer_account_id
+                        or transaction.other_side_status != OtherSideStatus.RULE_BASED
                     )
-                ):
-                    transaction.counterparty_account_id = rule.counterparty_account_id
-                    transaction.counterparty_status = CounterpartyStatus.RULE_BASED
-                    updated = True
+                    if other_side_changed:
+                        if rule.counterparty_id:
+                            transaction.assign_counterparty(rule.counterparty_id)
+                        else:
+                            transaction.assign_transfer_account(rule.transfer_account_id)
+                        transaction.other_side_status = OtherSideStatus.RULE_BASED
+                        updated = True
 
                 if updated:
                     changed.append(transaction)

@@ -92,7 +92,8 @@ class TransactionDTO:
         sort_index: Optional[int] = None,
         source_type: str = "upload",
         manual_position_after: Optional[UUID] = None,
-        counterparty_account_id: Optional[UUID] = None,
+        counterparty_id: Optional[UUID] = None,
+        transfer_account_id: Optional[UUID] = None,
     ):
         self.id = id
         self.date = date
@@ -109,7 +110,8 @@ class TransactionDTO:
         self.sort_index = sort_index
         self.source_type = source_type
         self.manual_position_after = manual_position_after
-        self.counterparty_account_id = counterparty_account_id
+        self.counterparty_id = counterparty_id
+        self.transfer_account_id = transfer_account_id
 
     @classmethod
     def from_entity(cls, entity):
@@ -129,7 +131,8 @@ class TransactionDTO:
             sort_index=entity.sort_index,
             source_type=entity.source_type.value if entity.source_type else "upload",
             manual_position_after=entity.manual_position_after,
-            counterparty_account_id=entity.counterparty_account_id,
+            counterparty_id=entity.counterparty_id,
+            transfer_account_id=entity.transfer_account_id,
         )
 
 

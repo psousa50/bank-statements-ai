@@ -158,7 +158,7 @@ export const EnhancementRules: React.FC = () => {
         sort_order: i,
       })),
       category_id: rule.category_id,
-      counterparty_account_id: rule.counterparty_account_id,
+      counterparty_id: rule.counterparty_id,
       min_amount: rule.min_amount,
       max_amount: rule.max_amount,
       start_date: rule.start_date,
@@ -331,7 +331,7 @@ export const EnhancementRules: React.FC = () => {
           sort_order: i,
         })),
         category_id: applyingRule.category_id,
-        counterparty_account_id: applyingRule.counterparty_account_id,
+        counterparty_id: applyingRule.counterparty_id,
         min_amount: applyingRule.min_amount,
         max_amount: applyingRule.max_amount,
         start_date: applyingRule.start_date,
@@ -572,9 +572,9 @@ export const EnhancementRules: React.FC = () => {
                   <br />• Category: {applyingRule.category.name}
                 </>
               )}
-              {applyingRule.counterparty_account && (
+              {applyingRule.counterparty && (
                 <>
-                  <br />• Counterparty: {applyingRule.counterparty_account.name}
+                  <br />• Counterparty: {applyingRule.counterparty.name}
                 </>
               )}
             </Typography>

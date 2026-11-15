@@ -7,6 +7,7 @@ from fastapi.encoders import jsonable_encoder
 from app.api.schemas import TransactionCreate, TransactionResponse
 from app.domain.models.account import Account
 from app.domain.models.category import Category
+from app.domain.models.counterparty import Counterparty, CounterpartyType
 from app.domain.models.enhancement_rule import EnhancementRule, EnhancementRuleSource, MatchType
 from app.domain.models.enhancement_rule_pattern import EnhancementRulePattern
 from app.domain.models.transaction import CategorizationStatus, SourceType, Transaction
@@ -199,7 +200,7 @@ def test_get_counterparty_totals():
     totals = response_data["totals"]
     assert len(totals) == 2
 
-    totals_by_id = {total["counterparty_account_id"]: total for total in totals}
+    totals_by_id = {total["counterparty_id"]: total for total in totals}
 
     assert str(counterparty_id_1) in totals_by_id
     assert totals_by_id[str(counterparty_id_1)]["total_amount"] == -1437.48
@@ -253,8 +254,8 @@ def test_preview_enhancement_with_exact_match():
     assert response_data["rule_pattern"] == "tesco"
     assert response_data["category_id"] == str(category_id)
     assert response_data["category_name"] == "Groceries"
-    assert response_data["counterparty_account_id"] is None
-    assert response_data["counterparty_account_name"] is None
+    assert response_data["counterparty_id"] is None
+    assert response_data["counterparty_name"] is None
 
 
 def test_preview_enhancement_with_prefix_match():
@@ -347,49 +348,93 @@ def test_preview_enhancement_with_counterparty():
     internal_dependencies = mocked_dependencies()
 
     account_id = uuid4()
-    counterparty_account_id = uuid4()
+    counterparty_id = uuid4()
     rule_id = uuid4()
 
-    mock_counterparty = Account(id=counterparty_account_id, name="Savings Account")
+    mock_counterparty = Counterparty(id=counterparty_id, name="Filipe", type=CounterpartyType.PERSON)
     mock_rule = _rule_with_pattern(
-        "transfer to savings",
+        "transfer to filipe",
         MatchType.EXACT,
         id=rule_id,
-        counterparty_account_id=counterparty_account_id,
+        counterparty_id=counterparty_id,
         source=EnhancementRuleSource.MANUAL,
     )
 
     internal_dependencies.enhancement_rule_repository.find_matching_rules.return_value = [mock_rule]
-    internal_dependencies.account_repository.get_by_id.return_value = mock_counterparty
+    internal_dependencies.counterparty_repository.get_by_id.return_value = mock_counterparty
 
     def mock_apply_rules(transactions, rules):
         transaction = transactions[0]
-        transaction.counterparty_account_id = counterparty_account_id
+        transaction.counterparty_id = counterparty_id
         return [transaction]
 
     internal_dependencies.transaction_enhancer.apply_rules.side_effect = mock_apply_rules
 
     client = build_client(internal_dependencies)
 
-    request_data = {
-        "description": "Transfer to Savings",
-        "amount": "500.00",
-        "account_id": str(account_id),
-    }
-
     response = client.post(
         "/api/v1/transactions/preview-enhancement",
-        json=request_data,
+        json={
+            "description": "Transfer to Filipe",
+            "amount": "500.00",
+            "account_id": str(account_id),
+        },
     )
 
     assert response.status_code == 200
     response_data = response.json()
 
     assert response_data["matched"] is True
-    assert response_data["category_id"] is None
-    assert response_data["category_name"] is None
-    assert response_data["counterparty_account_id"] == str(counterparty_account_id)
-    assert response_data["counterparty_account_name"] == "Savings Account"
+    assert response_data["counterparty_id"] == str(counterparty_id)
+    assert response_data["counterparty_name"] == "Filipe"
+    assert response_data["transfer_account_id"] is None
+    assert response_data["transfer_account_name"] is None
+
+
+def test_preview_enhancement_with_transfer_account():
+    internal_dependencies = mocked_dependencies()
+
+    account_id = uuid4()
+    transfer_account_id = uuid4()
+
+    mock_account = Account(id=transfer_account_id, name="Savings Account")
+    mock_rule = _rule_with_pattern(
+        "transfer to savings",
+        MatchType.EXACT,
+        id=uuid4(),
+        transfer_account_id=transfer_account_id,
+        source=EnhancementRuleSource.MANUAL,
+    )
+
+    internal_dependencies.enhancement_rule_repository.find_matching_rules.return_value = [mock_rule]
+    internal_dependencies.account_repository.get_by_id.return_value = mock_account
+
+    def mock_apply_rules(transactions, rules):
+        transaction = transactions[0]
+        transaction.transfer_account_id = transfer_account_id
+        return [transaction]
+
+    internal_dependencies.transaction_enhancer.apply_rules.side_effect = mock_apply_rules
+
+    client = build_client(internal_dependencies)
+
+    response = client.post(
+        "/api/v1/transactions/preview-enhancement",
+        json={
+            "description": "Transfer to Savings",
+            "amount": "500.00",
+            "account_id": str(account_id),
+        },
+    )
+
+    assert response.status_code == 200
+    response_data = response.json()
+
+    assert response_data["matched"] is True
+    assert response_data["transfer_account_id"] == str(transfer_account_id)
+    assert response_data["transfer_account_name"] == "Savings Account"
+    assert response_data["counterparty_id"] is None
+    assert response_data["counterparty_name"] is None
 
 
 def test_preview_enhancement_with_amount_constraint():

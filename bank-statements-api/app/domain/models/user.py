@@ -29,6 +29,7 @@ class User(Base):
     __table_args__ = (UniqueConstraint("oauth_provider", "oauth_id", name="uq_user_oauth"),)
 
     accounts = relationship("Account", back_populates="user")
+    counterparties = relationship("Counterparty", back_populates="user", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="user")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     subscription = relationship("Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan")

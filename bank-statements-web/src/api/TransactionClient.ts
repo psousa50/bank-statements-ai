@@ -51,7 +51,7 @@ export interface CategoryTotalsResponse {
 }
 
 export interface CounterpartyTotal {
-  counterparty_account_id?: string
+  counterparty_id?: string
   total_amount: number
   transaction_count: number
 }
@@ -141,8 +141,10 @@ export interface EnhancementPreviewResponse {
   rule_pattern?: string
   category_id?: string
   category_name?: string
-  counterparty_account_id?: string
-  counterparty_account_name?: string
+  counterparty_id?: string
+  counterparty_name?: string
+  transfer_account_id?: string
+  transfer_account_name?: string
 }
 
 export interface RecurringPattern {

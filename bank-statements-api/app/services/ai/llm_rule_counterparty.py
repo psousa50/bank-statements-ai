@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
-from app.adapters.repositories.account import SQLAlchemyAccountRepository
+from app.adapters.repositories.counterparty import SQLAlchemyCounterpartyRepository
 from app.ai.llm_client import LLMClient
 from app.ai.prompts import rule_counterparty_prompt
 from app.common.json_utils import sanitize_json
@@ -16,17 +16,17 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LLMCounterpartyResult:
     pattern: str
-    counterparty_account_id: Optional[str]
+    counterparty_id: Optional[str]
     confidence: float
 
 
 class LLMRuleCounterparty:
     def __init__(
         self,
-        account_repository: SQLAlchemyAccountRepository,
+        counterparty_repository: SQLAlchemyCounterpartyRepository,
         llm_client: LLMClient,
     ):
-        self.account_repository = account_repository
+        self.counterparty_repository = counterparty_repository
         self.llm_client = llm_client
 
     def suggest_counterparties(
@@ -37,21 +37,21 @@ class LLMRuleCounterparty:
         if not rules:
             return []
 
-        accounts = self.account_repository.get_all(user_id)
-        if not accounts:
+        counterparties = self.counterparty_repository.get_all(user_id)
+        if not counterparties:
             return [
                 RuleCounterpartyResult(
                     rule_id=rule.id,
                     suggested_counterparty_id=None,
                     confidence=None,
-                    error_message="No accounts available",
+                    error_message="No counterparties available",
                 )
                 for rule in rules
             ]
 
         try:
             patterns = [rule.normalized_description_pattern for rule in rules]
-            prompt = rule_counterparty_prompt(patterns, accounts)
+            prompt = rule_counterparty_prompt(patterns, counterparties)
 
             logger.debug(f"Sending {len(rules)} rules to LLM for counterparty identification")
             response = self.llm_client.generate(prompt)
@@ -71,7 +71,7 @@ class LLMRuleCounterparty:
             llm_results = [
                 LLMCounterpartyResult(
                     pattern=str(result.get("pattern", "")),
-                    counterparty_account_id=result.get("counterparty_account_id"),
+                    counterparty_id=result.get("counterparty_id"),
                     confidence=float(result.get("confidence", 0.0)),
                 )
                 for result in json_result
@@ -82,13 +82,13 @@ class LLMRuleCounterparty:
             for rule in rules:
                 matching_result = self._find_matching_result(rule.normalized_description_pattern, llm_results)
 
-                if matching_result and matching_result.counterparty_account_id:
-                    account_id = self._resolve_account_id(matching_result.counterparty_account_id, accounts)
-                    if account_id:
+                if matching_result and matching_result.counterparty_id:
+                    counterparty_id = self._resolve_counterparty_id(matching_result.counterparty_id, counterparties)
+                    if counterparty_id:
                         results.append(
                             RuleCounterpartyResult(
                                 rule_id=rule.id,
-                                suggested_counterparty_id=account_id,
+                                suggested_counterparty_id=counterparty_id,
                                 confidence=matching_result.confidence,
                             )
                         )
@@ -98,7 +98,7 @@ class LLMRuleCounterparty:
                                 rule_id=rule.id,
                                 suggested_counterparty_id=None,
                                 confidence=None,
-                                error_message=f"Account {matching_result.counterparty_account_id} not found",
+                                error_message=f"Counterparty {matching_result.counterparty_id} not found",
                             )
                         )
                 else:
@@ -131,17 +131,9 @@ class LLMRuleCounterparty:
                 return result
         return None
 
-    def _resolve_account_id(self, account_id_str: str, accounts: list) -> Optional[UUID]:
-        try:
-            account_uuid = UUID(account_id_str)
-            account = next(
-                (acc for acc in accounts if acc.id == account_uuid),
-                None,
-            )
-            return account.id if account else None
-        except ValueError:
-            account = next(
-                (acc for acc in accounts if str(acc.id) == account_id_str),
-                None,
-            )
-            return account.id if account else None
+    def _resolve_counterparty_id(self, counterparty_id_str: str, counterparties: list) -> Optional[UUID]:
+        match = next(
+            (c for c in counterparties if str(c.id) == counterparty_id_str),
+            None,
+        )
+        return match.id if match else None

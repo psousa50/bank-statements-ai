@@ -54,7 +54,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         offset: int = 0,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -70,7 +70,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
                 offset,
                 description_search,
                 category_ids,
-                counterparty_account_ids,
+                counterparty_ids,
                 match_type,
                 source,
                 rule_status_filter,
@@ -86,7 +86,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
                 offset,
                 description_search,
                 category_ids,
-                counterparty_account_ids,
+                counterparty_ids,
                 match_type,
                 source,
                 rule_status_filter,
@@ -99,7 +99,8 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             self.db.query(EnhancementRule)
             .options(
                 joinedload(EnhancementRule.category).joinedload(Category.parent),
-                joinedload(EnhancementRule.counterparty_account),
+                joinedload(EnhancementRule.counterparty),
+                joinedload(EnhancementRule.transfer_account),
                 joinedload(EnhancementRule.ai_suggested_category).joinedload(Category.parent),
                 joinedload(EnhancementRule.ai_suggested_counterparty),
             )
@@ -110,7 +111,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             query,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
@@ -121,7 +122,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         elif sort_field == "category":
             sort_column = EnhancementRule.category_id
         elif sort_field == "counterparty":
-            sort_column = EnhancementRule.counterparty_account_id
+            sort_column = EnhancementRule.counterparty_id
         elif sort_field == "source":
             sort_column = EnhancementRule.source
         else:
@@ -139,7 +140,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         query,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -150,8 +151,8 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         if category_ids:
             query = query.filter(EnhancementRule.category_id.in_(category_ids))
 
-        if counterparty_account_ids:
-            query = query.filter(EnhancementRule.counterparty_account_id.in_(counterparty_account_ids))
+        if counterparty_ids:
+            query = query.filter(EnhancementRule.counterparty_id.in_(counterparty_ids))
 
         if match_type:
             query = query.filter(_match_type_filter(match_type))
@@ -160,7 +161,13 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             query = query.filter(EnhancementRule.source == source)
 
         if rule_status_filter == "unconfigured":
-            query = query.filter(and_(EnhancementRule.category_id.is_(None), EnhancementRule.counterparty_account_id.is_(None)))
+            query = query.filter(
+                and_(
+                    EnhancementRule.category_id.is_(None),
+                    EnhancementRule.counterparty_id.is_(None),
+                    EnhancementRule.transfer_account_id.is_(None),
+                )
+            )
         elif rule_status_filter == "pending":
             query = query.filter(
                 or_(
@@ -174,8 +181,8 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
                     and_(
                         EnhancementRule.ai_suggested_counterparty_id.isnot(None),
                         or_(
-                            EnhancementRule.counterparty_account_id.is_(None),
-                            EnhancementRule.counterparty_account_id != EnhancementRule.ai_suggested_counterparty_id,
+                            EnhancementRule.counterparty_id.is_(None),
+                            EnhancementRule.counterparty_id != EnhancementRule.ai_suggested_counterparty_id,
                         ),
                     ),
                 )
@@ -189,7 +196,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
                     ),
                     and_(
                         EnhancementRule.ai_suggested_counterparty_id.isnot(None),
-                        EnhancementRule.counterparty_account_id == EnhancementRule.ai_suggested_counterparty_id,
+                        EnhancementRule.counterparty_id == EnhancementRule.ai_suggested_counterparty_id,
                     ),
                 )
             )
@@ -203,7 +210,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         offset: int,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -219,7 +226,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             offset=offset,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
@@ -238,7 +245,8 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             self.db.query(EnhancementRule)
             .options(
                 joinedload(EnhancementRule.category).joinedload(Category.parent),
-                joinedload(EnhancementRule.counterparty_account),
+                joinedload(EnhancementRule.counterparty),
+                joinedload(EnhancementRule.transfer_account),
                 joinedload(EnhancementRule.ai_suggested_category).joinedload(Category.parent),
                 joinedload(EnhancementRule.ai_suggested_counterparty),
             )
@@ -264,7 +272,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         offset: int,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -322,7 +330,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             query,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
@@ -344,7 +352,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         offset: int,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -356,7 +364,8 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             self.db.query(EnhancementRule)
             .options(
                 joinedload(EnhancementRule.category).joinedload(Category.parent),
-                joinedload(EnhancementRule.counterparty_account),
+                joinedload(EnhancementRule.counterparty),
+                joinedload(EnhancementRule.transfer_account),
                 joinedload(EnhancementRule.ai_suggested_category).joinedload(Category.parent),
                 joinedload(EnhancementRule.ai_suggested_counterparty),
             )
@@ -367,7 +376,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             query,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
@@ -458,7 +467,7 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
         user_id: UUID,
         description_search: Optional[str] = None,
         category_ids: Optional[List[UUID]] = None,
-        counterparty_account_ids: Optional[List[UUID]] = None,
+        counterparty_ids: Optional[List[UUID]] = None,
         match_type: Optional[MatchType] = None,
         source: Optional[EnhancementRuleSource] = None,
         rule_status_filter: Optional[str] = None,
@@ -468,12 +477,24 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             query,
             description_search=description_search,
             category_ids=category_ids,
-            counterparty_account_ids=counterparty_account_ids,
+            counterparty_ids=counterparty_ids,
             match_type=match_type,
             source=source,
             rule_status_filter=rule_status_filter,
         )
         return query.scalar()
+
+    def repoint_transfer_account_to_counterparty(self, account_id: UUID, counterparty_id: UUID, user_id: UUID) -> int:
+        updated = (
+            self.db.query(EnhancementRule)
+            .filter(EnhancementRule.user_id == user_id, EnhancementRule.transfer_account_id == account_id)
+            .update(
+                {EnhancementRule.counterparty_id: counterparty_id, EnhancementRule.transfer_account_id: None},
+                synchronize_session=False,
+            )
+        )
+        self.db.commit()
+        return updated
 
     def save(self, rule: EnhancementRule) -> EnhancementRule:
         self.db.add(rule)
@@ -486,7 +507,8 @@ class SQLAlchemyEnhancementRuleRepository(EnhancementRuleRepository):
             self.db.query(EnhancementRule)
             .options(
                 joinedload(EnhancementRule.category).joinedload(Category.parent),
-                joinedload(EnhancementRule.counterparty_account),
+                joinedload(EnhancementRule.counterparty),
+                joinedload(EnhancementRule.transfer_account),
                 joinedload(EnhancementRule.ai_suggested_category).joinedload(Category.parent),
                 joinedload(EnhancementRule.ai_suggested_counterparty),
             )

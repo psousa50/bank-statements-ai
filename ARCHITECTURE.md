@@ -26,7 +26,7 @@ bank-statements-api/
 │   ├── adapters/
 │   │   └── repositories/        # SQLAlchemy repository implementations
 │   ├── domain/
-│   │   ├── models/              # SQLAlchemy ORM models (15 tables)
+│   │   ├── models/              # SQLAlchemy ORM models (16 tables)
 │   │   └── dto/                 # Data transfer objects
 │   ├── ai/                      # LLM abstraction: Gemini, Groq, Noop clients
 │   ├── core/
@@ -62,6 +62,7 @@ bin/                             # Shell scripts (dev, db, deploy, test)
    - Delimited parsing decodes UTF-8 with a cp1252 fallback (Western-European bank exports) and pads ragged rows, so files with a metadata preamble above the real header (header not on row 1) are handled
    - A file is matched to its saved import config (account, mapping, row filters) by a **source fingerprint**: a hash of the heuristically-detected header row, with a fallback to the legacy column-name hash for configs saved before this scheme
 2. **Categorisation**: Enhancement rules (exact/prefix/infix match with amount/date constraints) → LLM suggestions (batched) → manual override
+   - A rule also assigns the transaction's other side: a counterparty, or a transfer account. The AI counterparty suggester reads `counterparties` only, so it can never propose one of your own accounts as a counterparty
 3. **Query**: Route → Service → Repository (user_id filtered) → paginated response with running balances
 4. **Chat**: User message → ChatService → LLM with transaction context → streamed SSE response
 
@@ -70,11 +71,12 @@ bin/                             # Shell scripts (dev, db, deploy, test)
 | Table | Key Relationships |
 |-------|------------------|
 | `users` | Root entity; OAuth + password auth |
-| `accounts` | Belongs to user; has currency; holds transactions |
-| `transactions` | Belongs to account + statement; has category, counterparty_account, tags (M2M via `transaction_tags`) |
+| `accounts` | Belongs to user; has currency; holds transactions, statements, initial balances and import configs. **Your own money sources and destinations only** — never a person or company |
+| `transactions` | Belongs to account + statement; has category, tags (M2M via `transaction_tags`), and an **other side** that is exactly one of `counterparty_id` (a person/entity) or `transfer_account_id` (one of your own accounts, i.e. an internal transfer). A CHECK constraint (`ck_transactions_single_other_side`) forbids both at once; `other_side_status` records how it was assigned (unprocessed/rule/manual/failure) |
+| `counterparties` | Belongs to user; the people, companies and merchants you transact with. `name` unique per user, `type` enum (person/company/merchant/other). Structurally distinct from `accounts`: no currency, no statements, no balances |
 | `categories` | Hierarchical (max 2 levels via parent_id); has colour; `kind` enum (expense/income/transfer/reimbursable) classifies the money-flow role used by analytics filters; `priority` enum (need/comfort/unplanned/extra) drives the Savings page and Charts "Essentials only" filter; `is_regular` flag marks predictable monthly baseline (root flag is authoritative for the tree) used by Charts "Regular only" filter |
 | `statements` | Belongs to account; stores raw file content |
-| `enhancement_rules` | Pattern matching rules with AI suggestion fields; can carry a split template (`enhancement_rule_split_lines`) that auto-splits a matched transaction into children — fixed-amount lines plus one remainder line that absorbs any drift |
+| `enhancement_rules` | Pattern matching rules with AI suggestion fields; carries the same mutually-exclusive other side as transactions (`counterparty_id` xor `transfer_account_id`, enforced by `ck_enhancement_rules_single_other_side`); can carry a split template (`enhancement_rule_split_lines`) that auto-splits a matched transaction into children — fixed-amount lines plus one remainder line that absorbs any drift |
 | `enhancement_rule_patterns` | Ordered list of `(normalized_description, match_type)` rows per rule. A rule matches a transaction if ANY of its patterns matches. Replaces both the old single-pattern column and the separate description-groups concept |
 | `enhancement_rule_split_lines` | Ordered child rows of an enhancement rule (label, amount, is_remainder, category_id). Applied post-save on upload and during retroactive "apply rule" |
 | `tags` | M2M with transactions via junction table; names unique per user (case-insensitive). Tags are durable entities managed on the Tags page — untagging the last transaction leaves the tag in place, and deleting a tag drops its transaction associations via cascade |
@@ -95,7 +97,8 @@ All routes under `/api/v1`, all require authentication.
 | Transactions | 12 | CRUD, bulk categorise/tag, category totals, counterparty totals, time series, recurring patterns |
 | Statements | 6 | Analyse (schema detect + preview), upload, preview-filter, preview-statistics |
 | Categories | 7 | CRUD, CSV import, AI suggestions, generate from transactions |
-| Accounts | 6 | CRUD, CSV import, initial balance |
+| Accounts | 8 | CRUD, CSV import, initial balance, list conversion candidates, convert-to-counterparty |
+| Counterparties | 7 | CRUD, CSV import/export |
 | Enhancement Rules | 6 | CRUD, apply rule, preview matches, AI suggestions |
 | Tags | 7 | CRUD (list includes per-tag transaction counts), rename, delete, add/remove from transaction, bulk add |
 | Auth | 7 | Register, login, OAuth (Google), refresh, logout, test-login |
@@ -128,6 +131,7 @@ All routes under `/api/v1`, all require authentication.
 - **Hexagonal architecture**: ports (interfaces) in `ports/`, adapters (implementations) in `adapters/`
 - **DI container**: `ExternalDependencies` (session, LLM) → `InternalDependencies` (21 services wired to repos)
 - **Multi-tenancy**: all repository queries auto-filter by `user_id`
+- **Accounts vs counterparties**: `accounts` are yours (currency, statements, balances, import configs all hang off them); `counterparties` are the parties you transact with. The two are separate tables so the database, not convention, guarantees a statement or balance can never attach to a person. A transaction's other side is one or the other, never both. An account created by mistake as an entity is fixed with `POST /accounts/{id}/convert-to-counterparty`, which repoints its references and deletes it, and refuses any account that owns statements, transactions, a balance or import configs
 - **Schema naming**: Pydantic `*Create`, `*Update`, `*Response`; SQLAlchemy models map to tables
 - **Frontend layers**: Pages → Components → Hooks (TanStack Query) → API Clients → Context providers
 - **State management**: server state in TanStack Query, auth/theme/errors in React Context, filters in URL params

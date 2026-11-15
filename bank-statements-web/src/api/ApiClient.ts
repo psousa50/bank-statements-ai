@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance } from 'axios'
 import { ApiError, ErrorType } from '../types/ApiError'
 import { CategoryClient } from './CategoryClient'
 import { AccountClient } from './AccountClient'
+import { CounterpartyClient } from './CounterpartyClient'
 import { StatementClient } from './StatementClient'
 import { TransactionClient } from './TransactionClient'
 import { TransactionCategorizationClient } from './TransactionCategorizationClient'
@@ -107,6 +108,7 @@ export interface ApiClient {
   categories: CategoryClient
   statements: StatementClient
   accounts: AccountClient
+  counterparties: CounterpartyClient
   subscription: SubscriptionClient
   tags: TagClient
   chatClient: ChatClient

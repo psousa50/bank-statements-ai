@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined'
 import { Category, Transaction, Account, Tag } from '../types/Transaction'
+import { useCounterparties } from '../services/hooks/useCounterparties'
 import { Toast, ToastProps } from './Toast'
 import { ConfirmationModal } from './ConfirmationModal'
 import { BulkCategorizeModal } from './BulkCategorizeModal'
@@ -347,6 +348,7 @@ export const TransactionTable = ({
   onToggleExcludeFromAnalytics,
   onSplitSuccess,
 }: TransactionTableProps) => {
+  const { counterparties } = useCounterparties()
   const apiClient = useApi()
   const queryClient = useQueryClient()
   const [toast, setToast] = useState<Omit<ToastProps, 'onClose'> | null>(null)
@@ -595,6 +597,12 @@ export const TransactionTable = ({
     return account ? account.name : 'Unknown'
   }
 
+  const getCounterpartyName = (counterpartyId?: string) => {
+    if (!counterpartyId) return 'Unknown'
+    const counterparty = counterparties.find((c) => c.id === counterpartyId)
+    return counterparty ? counterparty.name : 'Unknown'
+  }
+
   return (
     <div className="transaction-table">
       <h2>Transactions</h2>
@@ -695,9 +703,15 @@ export const TransactionTable = ({
                     )}
                     {transaction.description}
                   </div>
-                  {transaction.counterparty_account_id && (
+                  {transaction.counterparty_id && (
                     <div className={`counterparty-badge ${transaction.amount < 0 ? 'negative' : 'positive'}`}>
-                      {transaction.amount < 0 ? 'to' : 'from'}: {getAccountName(transaction.counterparty_account_id)}
+                      {transaction.amount < 0 ? 'to' : 'from'}: {getCounterpartyName(transaction.counterparty_id)}
+                    </div>
+                  )}
+                  {transaction.transfer_account_id && (
+                    <div className={`counterparty-badge ${transaction.amount < 0 ? 'negative' : 'positive'}`}>
+                      transfer {transaction.amount < 0 ? 'to' : 'from'}:{' '}
+                      {getAccountName(transaction.transfer_account_id)}
                     </div>
                   )}
                   {transaction.tags && transaction.tags.length > 0 && (

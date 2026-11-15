@@ -2,6 +2,7 @@
 from .account import Account
 from .background_job import BackgroundJob, JobStatus, JobType
 from .category import Category
+from .counterparty import Counterparty, CounterpartyType
 from .enhancement_rule import EnhancementRule, EnhancementRuleSource, MatchType
 from .enhancement_rule_pattern import EnhancementRulePattern
 from .enhancement_rule_split_line import EnhancementRuleSplitLine
@@ -19,7 +20,7 @@ from .saved_filter import SavedFilter
 from .statement import Statement
 from .subscription import TIER_LIMITS, Subscription, SubscriptionStatus, SubscriptionTier, SubscriptionUsage
 from .tag import Tag, transaction_tags
-from .transaction import CategorizationStatus, Transaction
+from .transaction import CategorizationStatus, OtherSideStatus, Transaction
 from .uploaded_file import FileAnalysisMetadata, UploadedFile
 from .user import User
 
@@ -30,6 +31,9 @@ __all__ = [
     "JobType",
     # Category
     "Category",
+    # Counterparty
+    "Counterparty",
+    "CounterpartyType",
     # Enhancement Rule
     "EnhancementRule",
     "EnhancementRulePattern",
@@ -51,6 +55,7 @@ __all__ = [
     "transaction_tags",
     # Transaction
     "CategorizationStatus",
+    "OtherSideStatus",
     "Transaction",
     # Statement
     "Statement",

@@ -463,11 +463,11 @@ def register_transaction_routes(
 
         totals = [
             CounterpartyTotalResponse(
-                counterparty_account_id=counterparty_account_id,
+                counterparty_id=counterparty_id,
                 total_amount=values["total_amount"],
                 transaction_count=int(values["transaction_count"]),
             )
-            for counterparty_account_id, values in totals_dict.items()
+            for counterparty_id, values in totals_dict.items()
         ]
 
         return CounterpartyTotalsResponse(totals=totals)
@@ -654,7 +654,11 @@ def register_transaction_routes(
         enhanced = internal.transaction_enhancer.apply_rules([temp_transaction], rules)
         enhanced_transaction = enhanced[0]
 
-        if not enhanced_transaction.category_id and not enhanced_transaction.counterparty_account_id:
+        if (
+            not enhanced_transaction.category_id
+            and not enhanced_transaction.counterparty_id
+            and not enhanced_transaction.transfer_account_id
+        ):
             return EnhancementPreviewResponse(matched=False)
 
         category_name = None
@@ -663,9 +667,14 @@ def register_transaction_routes(
             category_name = category.name if category else None
 
         counterparty_name = None
-        if enhanced_transaction.counterparty_account_id:
-            counterparty = internal.account_repository.get_by_id(enhanced_transaction.counterparty_account_id, current_user.id)
+        if enhanced_transaction.counterparty_id:
+            counterparty = internal.counterparty_repository.get_by_id(enhanced_transaction.counterparty_id, current_user.id)
             counterparty_name = counterparty.name if counterparty else None
+
+        transfer_account_name = None
+        if enhanced_transaction.transfer_account_id:
+            transfer_account = internal.account_repository.get_by_id(enhanced_transaction.transfer_account_id, current_user.id)
+            transfer_account_name = transfer_account.name if transfer_account else None
 
         matched_pattern_text = None
         for rule in rules:
@@ -681,8 +690,10 @@ def register_transaction_routes(
             rule_pattern=matched_pattern_text or normalized_desc,
             category_id=enhanced_transaction.category_id,
             category_name=category_name,
-            counterparty_account_id=enhanced_transaction.counterparty_account_id,
-            counterparty_account_name=counterparty_name,
+            counterparty_id=enhanced_transaction.counterparty_id,
+            counterparty_name=counterparty_name,
+            transfer_account_id=enhanced_transaction.transfer_account_id,
+            transfer_account_name=transfer_account_name,
         )
 
     @router.put(
@@ -966,7 +977,8 @@ def register_transaction_routes(
             amount=transaction_data.amount,
             account_id=transaction_data.account_id,
             category_id=transaction_data.category_id,
-            counterparty_account_id=transaction_data.counterparty_account_id,
+            counterparty_id=transaction_data.counterparty_id,
+            transfer_account_id=transaction_data.transfer_account_id,
         )
         if not updated_transaction:
             raise HTTPException(

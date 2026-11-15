@@ -17,6 +17,7 @@ def service():
             enhancement_rule_repository=MagicMock(),
             category_repository=MagicMock(),
             account_repository=MagicMock(),
+            counterparty_repository=MagicMock(),
             transaction_repository=transaction_repository,
             transaction_service=MagicMock(),
         ),

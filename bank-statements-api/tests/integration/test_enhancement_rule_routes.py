@@ -4,6 +4,7 @@ import pytest
 
 from app.adapters.repositories.account import SQLAlchemyAccountRepository
 from app.adapters.repositories.category import SQLAlchemyCategoryRepository
+from app.adapters.repositories.counterparty import SQLAlchemyCounterpartyRepository
 from app.adapters.repositories.enhancement_rule import SQLAlchemyEnhancementRuleRepository
 from app.adapters.repositories.transaction import SQLAlchemyTransactionRepository
 from app.services.enhancement_rule_management import EnhancementRuleManagementService
@@ -16,6 +17,7 @@ def client(db_session, user_a):
         enhancement_rule_repository=SQLAlchemyEnhancementRuleRepository(db_session),
         category_repository=SQLAlchemyCategoryRepository(db_session),
         account_repository=SQLAlchemyAccountRepository(db_session),
+        counterparty_repository=SQLAlchemyCounterpartyRepository(db_session),
         transaction_repository=SQLAlchemyTransactionRepository(db_session),
         transaction_service=MagicMock(),
     )

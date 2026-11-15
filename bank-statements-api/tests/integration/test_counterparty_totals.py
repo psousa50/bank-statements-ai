@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.adapters.repositories.transaction import SQLAlchemyTransactionRepository
-from app.domain.models.account import Account
+from app.domain.models.counterparty import Counterparty, CounterpartyType
 from app.domain.models.statement import Statement
 from app.domain.models.transaction import CategorizationStatus, SourceType, Transaction
 
@@ -25,10 +25,10 @@ def statement_for_user_a(db_session, account_for_user_a):
 
 
 def _counterparty(db_session, user_id, name):
-    account = Account(id=uuid4(), user_id=user_id, name=name, currency="EUR")
-    db_session.add(account)
+    counterparty = Counterparty(id=uuid4(), user_id=user_id, name=name, type=CounterpartyType.OTHER)
+    db_session.add(counterparty)
     db_session.flush()
-    return account
+    return counterparty
 
 
 def _create_transaction(db_session, account, statement, amount, counterparty=None, **overrides):
@@ -43,7 +43,7 @@ def _create_transaction(db_session, account, statement, amount, counterparty=Non
         statement_id=statement.id,
         source_type=SourceType.UPLOAD,
         categorization_status=CategorizationStatus.UNCATEGORIZED,
-        counterparty_account_id=counterparty.id if counterparty else None,
+        counterparty_id=counterparty.id if counterparty else None,
         row_index=0,
         sort_index=0,
         exclude_from_analytics=False,

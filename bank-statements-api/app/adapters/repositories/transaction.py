@@ -11,7 +11,7 @@ from app.common.text_normalization import normalize_description
 from app.domain.dto.statement_processing import TransactionDTO
 from app.domain.models.category import Category, CategoryKind, CategoryPriority
 from app.domain.models.tag import Tag
-from app.domain.models.transaction import CategorizationStatus, CounterpartyStatus, SourceType, Transaction
+from app.domain.models.transaction import CategorizationStatus, OtherSideStatus, SourceType, Transaction
 from app.ports.repositories.transaction import TransactionRepository
 
 
@@ -328,12 +328,12 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         exclude_from_analytics: Optional[bool] = None,
     ) -> Dict[Optional[UUID], Dict[str, Decimal]]:
         query = self.db_session.query(
-            Transaction.counterparty_account_id,
+            Transaction.counterparty_id,
             func.sum(-Transaction.amount).label("total_amount"),
             func.count(Transaction.id).label("transaction_count"),
         ).filter(
             Transaction.user_id == user_id,
-            Transaction.counterparty_account_id.isnot(None),
+            Transaction.counterparty_id.isnot(None),
         )
 
         filters = []
@@ -366,15 +366,15 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         if filters:
             query = query.filter(and_(*filters))
 
-        results = query.group_by(Transaction.counterparty_account_id).all()
+        results = query.group_by(Transaction.counterparty_id).all()
 
         totals = {}
         for (
-            counterparty_account_id,
+            counterparty_id,
             total_amount,
             transaction_count,
         ) in results:
-            totals[counterparty_account_id] = {
+            totals[counterparty_id] = {
                 "total_amount": Decimal(str(total_amount)) if total_amount else Decimal("0"),
                 "transaction_count": Decimal(str(transaction_count)),
             }
@@ -562,6 +562,26 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         self.db_session.refresh(transaction)
         return transaction
 
+    def repoint_transfer_account_to_counterparty(self, account_id: UUID, counterparty_id: UUID, user_id: UUID) -> int:
+        updated = (
+            self.db_session.query(Transaction)
+            .filter(Transaction.user_id == user_id, Transaction.transfer_account_id == account_id)
+            .update(
+                {Transaction.counterparty_id: counterparty_id, Transaction.transfer_account_id: None},
+                synchronize_session=False,
+            )
+        )
+        self.db_session.commit()
+        return updated
+
+    def count_by_transfer_account(self, account_id: UUID, user_id: UUID) -> int:
+        return (
+            self.db_session.query(func.count(Transaction.id))
+            .filter(Transaction.user_id == user_id, Transaction.transfer_account_id == account_id)
+            .scalar()
+            or 0
+        )
+
     def save_all(self, transactions: List[Transaction]) -> None:
         if not transactions:
             return
@@ -694,8 +714,9 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
                     source_type=account_type_enum,
                     manual_position_after=transaction_dto.manual_position_after,
                     category_id=UUID(transaction_dto.category_id) if transaction_dto.category_id else None,
-                    counterparty_account_id=(
-                        UUID(transaction_dto.counterparty_account_id) if transaction_dto.counterparty_account_id else None
+                    counterparty_id=(UUID(transaction_dto.counterparty_id) if transaction_dto.counterparty_id else None),
+                    transfer_account_id=(
+                        UUID(transaction_dto.transfer_account_id) if transaction_dto.transfer_account_id else None
                     ),
                     categorization_status=transaction_dto.categorization_status or CategorizationStatus.UNCATEGORIZED,
                 )
@@ -931,6 +952,17 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
             description=transaction_data.description,
             normalized_description=normalize_description(transaction_data.description),
             account_id=transaction_data.account_id,
+            category_id=transaction_data.category_id,
+            categorization_status=(
+                CategorizationStatus.MANUAL if transaction_data.category_id else CategorizationStatus.UNCATEGORIZED
+            ),
+            counterparty_id=transaction_data.counterparty_id,
+            transfer_account_id=transaction_data.transfer_account_id,
+            other_side_status=(
+                OtherSideStatus.MANUAL
+                if transaction_data.counterparty_id or transaction_data.transfer_account_id
+                else OtherSideStatus.UNPROCESSED
+            ),
             sort_index=sort_index,
             source_type=SourceType.MANUAL,
             manual_position_after=after_transaction_id,
@@ -1044,19 +1076,36 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
                 )
             )
 
-        if rule.counterparty_account_id is not None:
+        if rule.counterparty_id is not None:
             would_change_conditions.append(
                 and_(
-                    Transaction.counterparty_status.in_(
+                    Transaction.other_side_status.in_(
                         [
-                            CounterpartyStatus.UNPROCESSED,
-                            CounterpartyStatus.RULE_BASED,
-                            CounterpartyStatus.FAILURE,
+                            OtherSideStatus.UNPROCESSED,
+                            OtherSideStatus.RULE_BASED,
+                            OtherSideStatus.FAILURE,
                         ]
                     ),
                     or_(
-                        Transaction.counterparty_account_id.is_distinct_from(rule.counterparty_account_id),
-                        Transaction.counterparty_status != CounterpartyStatus.RULE_BASED,
+                        Transaction.counterparty_id.is_distinct_from(rule.counterparty_id),
+                        Transaction.other_side_status != OtherSideStatus.RULE_BASED,
+                    ),
+                )
+            )
+
+        if rule.transfer_account_id is not None:
+            would_change_conditions.append(
+                and_(
+                    Transaction.other_side_status.in_(
+                        [
+                            OtherSideStatus.UNPROCESSED,
+                            OtherSideStatus.RULE_BASED,
+                            OtherSideStatus.FAILURE,
+                        ]
+                    ),
+                    or_(
+                        Transaction.transfer_account_id.is_distinct_from(rule.transfer_account_id),
+                        Transaction.other_side_status != OtherSideStatus.RULE_BASED,
                     ),
                 )
             )
