@@ -8,6 +8,7 @@ import {
   Account,
   Tag,
 } from '../types/Transaction'
+import { Counterparty } from '../types/Counterparty'
 import { CategorySelector } from './CategorySelector'
 import { DatePeriodNavigator } from './DatePeriodNavigator'
 import { FilterPreset } from '../api/FilterPresetClient'
@@ -21,8 +22,10 @@ export type CategorizationFilter = 'all' | 'categorized' | 'uncategorized'
 interface TransactionFiltersProps {
   categories: Category[]
   accounts: Account[]
+  counterparties?: Counterparty[]
   selectedCategoryIds?: string[]
   selectedAccountId?: string
+  selectedCounterpartyId?: string
   minAmount?: number
   maxAmount?: number
   descriptionSearch?: string
@@ -42,6 +45,7 @@ interface TransactionFiltersProps {
   onTagChange?: (tagIds: string[]) => void
   onCategoryChange: (categoryIds: string[]) => void
   onAccountChange: (accountId?: string) => void
+  onCounterpartyChange?: (counterpartyId?: string) => void
   onAmountRangeChange: (minAmount?: number, maxAmount?: number) => void
   onDescriptionSearchChange: (search?: string) => void
   onDateRangeChange?: (startDate?: string, endDate?: string) => void
@@ -61,8 +65,10 @@ interface TransactionFiltersProps {
 export const TransactionFilters = ({
   categories,
   accounts,
+  counterparties,
   selectedCategoryIds = [],
   selectedAccountId,
+  selectedCounterpartyId,
   minAmount,
   maxAmount,
   descriptionSearch,
@@ -82,6 +88,7 @@ export const TransactionFilters = ({
   onTagChange,
   onCategoryChange,
   onAccountChange,
+  onCounterpartyChange,
   onAmountRangeChange,
   onDescriptionSearchChange,
   onDateRangeChange,
@@ -119,6 +126,7 @@ export const TransactionFilters = ({
     maxAmount !== undefined ||
     descriptionSearch ||
     selectedAccountId ||
+    selectedCounterpartyId ||
     categorizationFilter !== defaultCategorizationFilter ||
     transactionType !== defaultTransactionType ||
     kind !== 'all' ||
@@ -308,6 +316,26 @@ export const TransactionFilters = ({
                 ]}
               />
             </div>
+
+            {counterparties && onCounterpartyChange && (
+              <div className="filter-group">
+                <label htmlFor="counterparty-filter" className="filter-label">
+                  Counterparty
+                </label>
+                <StyledSelect
+                  id="counterparty-filter"
+                  value={selectedCounterpartyId || ''}
+                  onChange={(v) => onCounterpartyChange(v || undefined)}
+                  options={[
+                    { value: '', label: 'All Counterparties' },
+                    ...counterparties.map((counterparty) => ({
+                      value: counterparty.id,
+                      label: counterparty.name,
+                    })),
+                  ]}
+                />
+              </div>
+            )}
 
             {allTags && onTagChange && (
               <div className="filter-group">

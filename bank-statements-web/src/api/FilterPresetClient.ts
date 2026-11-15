@@ -3,6 +3,7 @@ import { axiosInstance } from './ApiClient'
 export interface FilterPresetData {
   category_ids?: string[]
   account_id?: string
+  counterparty_id?: string
   min_amount?: number
   max_amount?: number
   description_search?: string

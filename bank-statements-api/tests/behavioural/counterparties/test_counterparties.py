@@ -247,3 +247,33 @@ def test_a_rule_cannot_set_both_a_counterparty_and_a_transfer_account(client, un
     assert created.status_code == 422, (
         f"a rule with both a counterparty and a transfer account was accepted with " f"{created.status_code}: {created.text}"
     )
+
+
+@pytest.mark.behaviour("transactions.filtering.by_counterparty")
+def test_transactions_can_be_filtered_to_one_counterparty(client, unique):
+    account = _account(client, unique)
+    wanted = _counterparty(client, unique, prefix="wanted")
+    other = _counterparty(client, unique, prefix="other")
+
+    for counterparty in (wanted, wanted, other):
+        created = client.post(
+            "/transactions",
+            json={
+                "date": "2024-04-01",
+                "description": unique("payment"),
+                "amount": -25.00,
+                "account_id": account["id"],
+                "counterparty_id": counterparty["id"],
+            },
+        )
+        assert created.status_code in (200, 201), f"POST /transactions returned {created.status_code}: {created.text}"
+
+    listed = client.get("/transactions", params={"counterparty_id": wanted["id"], "page_size": 100})
+
+    assert listed.status_code == 200, f"GET /transactions returned {listed.status_code}: {listed.text}"
+    returned = listed.json()["transactions"]
+    assert returned, f"filtering by counterparty {wanted['name']!r} returned nothing"
+    assert all(
+        t["counterparty_id"] == wanted["id"] for t in returned
+    ), "the counterparty filter returned transactions belonging to a different counterparty"
+    assert len(returned) == 2

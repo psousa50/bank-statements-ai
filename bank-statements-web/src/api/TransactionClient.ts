@@ -14,6 +14,7 @@ export interface TransactionFilters {
   max_amount?: number
   description_search?: string
   account_id?: string
+  counterparty_id?: string
   start_date?: string
   end_date?: string
   include_running_balance?: boolean
@@ -258,6 +259,9 @@ export const transactionClient: TransactionClient = {
     if (filters?.account_id) {
       params.append('account_id', filters.account_id)
     }
+    if (filters?.counterparty_id) {
+      params.append('counterparty_id', filters.counterparty_id)
+    }
     if (filters?.start_date) {
       params.append('start_date', filters.start_date)
     }
@@ -327,6 +331,9 @@ export const transactionClient: TransactionClient = {
     if (filters?.account_id) {
       params.append('account_id', filters.account_id)
     }
+    if (filters?.counterparty_id) {
+      params.append('counterparty_id', filters.counterparty_id)
+    }
     if (filters?.start_date) {
       params.append('start_date', filters.start_date)
     }
@@ -393,6 +400,9 @@ export const transactionClient: TransactionClient = {
     if (filters?.account_id) {
       params.append('account_id', filters.account_id)
     }
+    if (filters?.counterparty_id) {
+      params.append('counterparty_id', filters.counterparty_id)
+    }
     if (filters?.start_date) {
       params.append('start_date', filters.start_date)
     }
@@ -428,6 +438,9 @@ export const transactionClient: TransactionClient = {
     }
     if (filters?.account_id) {
       params.append('account_id', filters.account_id)
+    }
+    if (filters?.counterparty_id) {
+      params.append('counterparty_id', filters.counterparty_id)
     }
     if (filters?.start_date) {
       params.append('start_date', filters.start_date)
@@ -475,6 +488,9 @@ export const transactionClient: TransactionClient = {
     }
     if (filters?.account_id) {
       params.append('account_id', filters.account_id)
+    }
+    if (filters?.counterparty_id) {
+      params.append('counterparty_id', filters.counterparty_id)
     }
     if (filters?.start_date) {
       params.append('start_date', filters.start_date)

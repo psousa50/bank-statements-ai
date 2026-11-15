@@ -220,6 +220,51 @@ class TestAccountConversion:
             conversion_service.convert_to_counterparty(other.id, user_a.id)
 
 
+class TestFilteringByCounterparty:
+    def test_filters_transactions_down_to_one_counterparty(self, db_session, user_a, account_for_user_a):
+        landlord = Counterparty(id=uuid4(), user_id=user_a.id, name="Landlord", type=CounterpartyType.PERSON)
+        shop = Counterparty(id=uuid4(), user_id=user_a.id, name="Shop", type=CounterpartyType.MERCHANT)
+        db_session.add_all([landlord, shop])
+        db_session.flush()
+
+        _transaction(db_session, account_for_user_a, counterparty_id=landlord.id, amount=Decimal("-750.00"))
+        _transaction(db_session, account_for_user_a, counterparty_id=landlord.id, amount=Decimal("-750.00"))
+        _transaction(db_session, account_for_user_a, counterparty_id=shop.id, amount=Decimal("-20.00"))
+        _transaction(db_session, account_for_user_a)
+        db_session.commit()
+
+        repository = SQLAlchemyTransactionRepository(db_session)
+        transactions, total, _ = repository.get_paginated(user_id=user_a.id, counterparty_id=landlord.id)
+
+        assert total == 2
+        assert {t.counterparty_id for t in transactions} == {landlord.id}
+
+    def test_without_the_filter_every_transaction_is_returned(self, db_session, user_a, account_for_user_a):
+        shop = Counterparty(id=uuid4(), user_id=user_a.id, name="Shop", type=CounterpartyType.MERCHANT)
+        db_session.add(shop)
+        db_session.flush()
+        _transaction(db_session, account_for_user_a, counterparty_id=shop.id)
+        _transaction(db_session, account_for_user_a)
+        db_session.commit()
+
+        repository = SQLAlchemyTransactionRepository(db_session)
+        _, total, _ = repository.get_paginated(user_id=user_a.id)
+
+        assert total == 2
+
+    def test_does_not_leak_another_users_transactions(self, db_session, user_a, user_b, account_for_user_a):
+        shared_name = Counterparty(id=uuid4(), user_id=user_a.id, name="Shop", type=CounterpartyType.MERCHANT)
+        db_session.add(shared_name)
+        db_session.flush()
+        _transaction(db_session, account_for_user_a, counterparty_id=shared_name.id)
+        db_session.commit()
+
+        repository = SQLAlchemyTransactionRepository(db_session)
+        _, total, _ = repository.get_paginated(user_id=user_b.id, counterparty_id=shared_name.id)
+
+        assert total == 0
+
+
 class TestCounterpartyIsolation:
     def test_counterparty_names_are_unique_per_user(self, db_session, user_a):
         db_session.add(Counterparty(id=uuid4(), user_id=user_a.id, name="Filipe", type=CounterpartyType.PERSON))

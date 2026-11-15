@@ -94,6 +94,7 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         max_amount: Optional[Decimal] = None,
         description_search: Optional[str] = None,
         account_id: Optional[UUID] = None,
+        counterparty_id: Optional[UUID] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         sort_field: Optional[str] = None,
@@ -139,6 +140,10 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         # Account filter
         if account_id is not None:
             filters.append(Transaction.account_id == account_id)
+
+        # Counterparty filter
+        if counterparty_id is not None:
+            filters.append(Transaction.counterparty_id == counterparty_id)
 
         # Date range filters
         if start_date is not None:
@@ -228,6 +233,7 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         max_amount: Optional[Decimal] = None,
         description_search: Optional[str] = None,
         account_id: Optional[UUID] = None,
+        counterparty_id: Optional[UUID] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         exclude_uncategorized: Optional[bool] = None,
@@ -271,6 +277,10 @@ class SQLAlchemyTransactionRepository(TransactionRepository):
         # Account filter
         if account_id is not None:
             filters.append(Transaction.account_id == account_id)
+
+        # Counterparty filter
+        if counterparty_id is not None:
+            filters.append(Transaction.counterparty_id == counterparty_id)
 
         # Date range filters
         if start_date is not None:

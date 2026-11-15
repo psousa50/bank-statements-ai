@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTransactions } from '../services/hooks/useTransactions'
 import { useCategories } from '../services/hooks/useCategories'
 import { useAccounts } from '../services/hooks/useAccounts'
+import { useCounterparties } from '../services/hooks/useCounterparties'
 import { useTags } from '../services/hooks/useTags'
 import {
   TransactionTable,
@@ -60,6 +61,7 @@ export const TransactionsPage = () => {
     const urlEndDate = searchParams.get('end_date')
     const urlStatus = searchParams.get('status')
     const urlAccountId = searchParams.get('account_id')
+    const urlCounterpartyId = searchParams.get('counterparty_id')
     const urlCategoryIds = searchParams.get('category_ids')
     const urlSortField = searchParams.get('sort_field')
     const urlSortDirection = searchParams.get('sort_direction')
@@ -83,6 +85,7 @@ export const TransactionsPage = () => {
       end_date: urlEndDate || undefined,
       status: (urlStatus as CategorizationStatus) || undefined,
       account_id: urlAccountId || undefined,
+      counterparty_id: urlCounterpartyId || undefined,
       category_ids: urlCategoryIds ? urlCategoryIds.split(',') : undefined,
       sort_field: (urlSortField as TransactionSortField) || 'date',
       sort_direction: (urlSortDirection as TransactionSortDirection) || 'desc',
@@ -149,6 +152,7 @@ export const TransactionsPage = () => {
 
   const { categories, loading: categoriesLoading, error: categoriesError } = useCategories()
   const { accounts, loading: accountsLoading, error: accountsError } = useAccounts()
+  const { counterparties } = useCounterparties()
   const {
     tags: allTags,
     createTag,
@@ -266,6 +270,7 @@ export const TransactionsPage = () => {
     if (filters.description_search) params.set('description_search', filters.description_search)
     if (filters.category_ids?.length) params.set('category_ids', filters.category_ids.join(','))
     if (filters.account_id) params.set('account_id', filters.account_id)
+    if (filters.counterparty_id) params.set('counterparty_id', filters.counterparty_id)
     if (filters.min_amount != null) params.set('min_amount', filters.min_amount.toString())
     if (filters.max_amount != null) params.set('max_amount', filters.max_amount.toString())
     if (filters.start_date) params.set('start_date', filters.start_date)
@@ -452,6 +457,13 @@ export const TransactionsPage = () => {
     [handleFilterChange]
   )
 
+  const handleCounterpartyFilter = useCallback(
+    (counterpartyId?: string) => {
+      handleFilterChange({ counterparty_id: counterpartyId })
+    },
+    [handleFilterChange]
+  )
+
   const handleCategorizationFilterChange = useCallback(
     (filter: CategorizationFilter) => {
       setCategorizationFilter(filter)
@@ -560,6 +572,7 @@ export const TransactionsPage = () => {
       const filterData: FilterPresetData = {}
       if (filters.category_ids?.length) filterData.category_ids = filters.category_ids
       if (filters.account_id) filterData.account_id = filters.account_id
+      if (filters.counterparty_id) filterData.counterparty_id = filters.counterparty_id
       if (localMinAmount !== undefined) filterData.min_amount = localMinAmount
       if (localMaxAmount !== undefined) filterData.max_amount = localMaxAmount
       if (localDescriptionSearch) filterData.description_search = localDescriptionSearch
@@ -618,6 +631,7 @@ export const TransactionsPage = () => {
         page_size: filters.page_size,
         category_ids: data.category_ids ?? undefined,
         account_id: data.account_id ?? undefined,
+        counterparty_id: data.counterparty_id ?? undefined,
         min_amount: data.min_amount ?? undefined,
         max_amount: data.max_amount ?? undefined,
         description_search: data.description_search ?? undefined,
@@ -879,6 +893,9 @@ export const TransactionsPage = () => {
               accounts={accounts || []}
               selectedCategoryIds={filters.category_ids ?? []}
               selectedAccountId={filters.account_id}
+              counterparties={counterparties}
+              selectedCounterpartyId={filters.counterparty_id}
+              onCounterpartyChange={handleCounterpartyFilter}
               minAmount={localMinAmount}
               maxAmount={localMaxAmount}
               descriptionSearch={localDescriptionSearch}
