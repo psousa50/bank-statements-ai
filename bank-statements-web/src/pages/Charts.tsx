@@ -799,6 +799,23 @@ export const ChartsPage = () => {
   const activeNoDataMessage = useMemo(() => {
     if (!isCounterparty) return noDataMessage
     if (!counterpartyTotals) return { title: 'Loading...', description: 'Fetching transaction data.' }
+
+    const otherDirection = direction === 'spending' ? 'income' : 'spending'
+    const matchingOtherDirection = counterpartyTotals.totals.filter(
+      (t) => t.counterparty_id && keepByDirection(t.total_amount, otherDirection)
+    )
+
+    if (matchingOtherDirection.length > 0) {
+      const count = matchingOtherDirection.reduce((sum, t) => sum + t.transaction_count, 0)
+      return {
+        title: `No ${direction} to display`,
+        description:
+          `These counterparties only have ${otherDirection}: ${count} ` +
+          `${count === 1 ? 'transaction' : 'transactions'} across ` +
+          `${matchingOtherDirection.length} of them. Switch Show to "${otherDirection}" to see them.`,
+      }
+    }
+
     return {
       title: `No ${direction} to display`,
       description: 'No transactions with a counterparty match these filters. Assign counterparties to see them here.',
