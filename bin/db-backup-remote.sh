@@ -4,6 +4,16 @@ set -e
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 BACKUP_DIR="$ROOT_DIR/backups"
 
+# Supabase runs a newer Postgres than the Homebrew client, and pg_dump refuses to
+# dump a server newer than itself. Run it from an image matching the server instead.
+# Override with PG_IMAGE if Supabase moves to a different major version.
+PG_IMAGE="${PG_IMAGE:-postgres:17}"
+
+remote_pg_dump() {
+    docker run --rm -i -e PGURL="$1" "$PG_IMAGE" \
+        sh -c 'pg_dump "$PGURL" '"$2"
+}
+
 usage() {
     echo "Usage: $0"
     echo ""
@@ -58,6 +68,6 @@ mkdir -p "$BACKUP_DIR"
 BACKUP_FILE="$BACKUP_DIR/bank_statements_prod_$(date +%Y%m%d_%H%M%S).dump"
 
 echo "==> Dumping remote database..."
-pg_dump "$REMOTE_URL" --no-owner --no-acl -F c > "$BACKUP_FILE"
+remote_pg_dump "$REMOTE_URL" "--no-owner --no-acl -F c" > "$BACKUP_FILE"
 echo "Backup created: $BACKUP_FILE"
 echo "Restore with: pg_restore --no-owner --no-acl -d <target-url> \"$BACKUP_FILE\""

@@ -4,6 +4,16 @@ set -e
 LOCAL_DB="postgresql://postgres:postgres@localhost:54321/bank_statements"
 DUMP_FILE="/tmp/db_sync_dump.sql"
 
+# Supabase runs a newer Postgres than the Homebrew client, and pg_dump refuses to
+# dump a server newer than itself. Run it from an image matching the server instead.
+# Override with PG_IMAGE if Supabase moves to a different major version.
+PG_IMAGE="${PG_IMAGE:-postgres:17}"
+
+remote_pg_dump() {
+    docker run --rm -i -e PGURL="$1" "$PG_IMAGE" \
+        sh -c 'pg_dump "$PGURL" '"$2"
+}
+
 usage() {
     echo "Usage: $0 <direction>"
     echo ""
@@ -56,7 +66,7 @@ from_remote() {
     REMOTE_URL=$(get_remote_url)
 
     echo "==> Dumping remote database..."
-    pg_dump "$REMOTE_URL" --no-owner --no-acl -F p > "$DUMP_FILE"
+    remote_pg_dump "$REMOTE_URL" "--no-owner --no-acl -F p" > "$DUMP_FILE"
 
     echo "==> Restoring to local database..."
     psql "$LOCAL_DB" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" 2>/dev/null || true
